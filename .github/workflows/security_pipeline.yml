@@ -17,11 +17,21 @@ jobs:
       - name: Setup Node.js environment
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install codebase dependencies
         run: npm ci
+
+      - name: Initialise build environment
+        run: |
+          mkdir -p config
+          echo "module.exports = {};" > config/production.js
+
+      - name: Compile live codebase graph
+        run: |
+          npm run compile
+          npm run build:stats
 
       - name: Inject baseline proof mocks
         run: |

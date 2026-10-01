@@ -11,6 +11,12 @@
     "dev": "node ./packages/evershop/dist/bin/dev/index.js",
     "start": "node ./packages/evershop/dist/bin/start/index.js",
     "build": "node ./packages/evershop/dist/bin/build/index.js",
+
+
+    "build:stats": "npm run build",
+    "validate:pipeline": "node .github/security-rules/reachability-engine-validator.cjs",
+
+
     "setup": "evershop install",
     "user:create": "evershop user:create",
     "seed": "evershop seed",

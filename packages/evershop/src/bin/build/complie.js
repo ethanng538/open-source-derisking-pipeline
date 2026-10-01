@@ -5,10 +5,41 @@ import { createConfigServer } from '../../lib/webpack/prod/createConfigServer.js
 
 const { webpack } = pkg;
 
+import fs from 'fs';
+import path from 'path';
+
 function runOne(config) {
   const compiler = webpack(config);
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
+
+      if (stats && !stats.hasErrors()) {
+        try {
+          const statsJson = stats.toJson({ all: false, modules: true });
+          const targetOutput = path.join(process.cwd(), 'compilation-graph.json');
+
+          const compiledModules = (statsJson.modules || [])
+            .filter(m => m.name)
+            .map(m => ({ name: m.name }));
+
+          let existingData = { modules: [] };
+          if (fs.existsSync(targetOutput)) {
+            try {
+              existingData = JSON.parse(fs.readFileSync(targetOutput, 'utf8'));
+            } catch (e) {
+              // Silent fail
+            }
+          }
+
+          const combined = [...(existingData.modules || []), ...compiledModules];
+          const unique = Array.from(new Set(combined.map(m => m.name))).map(name => ({ name }));
+
+          fs.writeFileSync(targetOutput, JSON.stringify({ modules: unique }, null, 2), 'utf8');
+        } catch (dumpError) {
+        }
+      }
+
+
       // close() releases the compiler's resources (and flushes any persistent
       // cache). Resolve/reject from inside its callback so the compilation is
       // fully torn down — and collectable — before the next one starts.
