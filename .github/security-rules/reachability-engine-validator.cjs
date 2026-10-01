@@ -30,7 +30,7 @@ function runSafetyNet() {
   // Phase 1 structural validation passed if we made it here
   console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
 
-  console.log("\n=== Phase 2: Differential graph matrix ===");
+  console.log("\n=== Phase 2: Reachable vulnerability check ===");
   if (!fs.existsSync('compilation-graph.json')) {
     console.error("🚨 PHASE 2 CRITICAL: 'compilation-graph.json' not found. Webpack stats are missing.");
     process.exit(1);
