@@ -5,28 +5,39 @@ function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (err) {
-    console.error(`🚨 CRITICAL ERROR: Failed to read or parse file at ${filePath}`);
+    console.error(`🚨 CRITICAL CONFIG ERROR: Failed to read or parse file at ${filePath}`);
     process.exit(1);
   }
 }
 
 function runSafetyNet() {
-  console.log("=== Phase 1: structural validation ===");
+  let pipelineFailed = false;
+  const errorLog = [];
+
+  console.log("=== Phase 1: Structural validation ===");
   if (!fs.existsSync('reachability-results.json')) {
-    console.error("🚨 PHASE 1 FAILED: 'reachability-results.json' not found. Engine did not run.");
+    console.error("🚨 PHASE 1 CRITICAL: 'reachability-results.json' not found. Engine did not run.");
     process.exit(1);
   }
 
   const engineOutput = safeReadJson('reachability-results.json');
   if (!engineOutput.findings || !Array.isArray(engineOutput.findings)) {
-    console.error("🚨 PHASE 1 FAILED: Engine payload is missing a valid 'findings' array.");
+    console.error("🚨 PHASE 1 CRITICAL: Engine payload is missing a valid 'findings' array.");
     process.exit(1);
   }
 
-  console.log("=== Phase 2: differential graph matrix ===");
+  // Phase 1 structural validation passed if we made it here
+  console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
+
+  console.log("\n=== Phase 2: Differential graph matrix ===");
+  if (!fs.existsSync('compilation-graph.json')) {
+    console.error("🚨 PHASE 2 CRITICAL: 'compilation-graph.json' not found. Webpack stats are missing.");
+    process.exit(1);
+  }
+
   const webpackGraph = safeReadJson('compilation-graph.json');
 
-  // Extract normalized pathways compiled by Webpack
+  // Extract and normalize pathways compiled by Webpack
   const clientCompiledSet = new Set(
     (webpackGraph.modules || [])
       .map(m => m.name ? path.normalize(m.name).replace(/^.*node_modules[\\/]/, '') : null)
@@ -37,48 +48,67 @@ function runSafetyNet() {
   let totalRecordsChecked = 0;
   let counts = { REACHABLE: 0, MUTED: 0 };
 
+  // 1. Loop through all verdicts and ACCUMULATE breaches instead of exiting early
   for (const finding of engineOutput.findings) {
+    if (!finding.filePath || !finding.status) {
+      errorLog.push(`Malformed record structure found at index ${totalRecordsChecked}`);
+      pipelineFailed = true;
+      totalRecordsChecked++;
+      continue;
+    }
+
     const normalizedPath = path.normalize(finding.filePath);
     const fileInWebpack = clientCompiledSet.has(normalizedPath);
     counts[finding.status] = (counts[finding.status] || 0) + 1;
 
-    // Reachable files must be inside Webpack's compiled graph as invariant logic
+    // Law 1 check
     if (finding.status === 'REACHABLE' && !fileInWebpack) {
-      console.error(`🚨 LOGIC BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it does not exist in Webpack.`);
-      process.exit(1);
+      errorLog.push(`LAW 1 BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it does not exist in Webpack.`);
+      pipelineFailed = true;
     }
 
-    // Muted files must not be inside Webpack's compiled graph as invariant logic
+    // Law 2 check
     if (finding.status === 'MUTED' && fileInWebpack) {
-      console.error(`🚨 LOGIC BREACH: Engine flagged '${finding.filePath}' as MUTED but Webpack actively compiled this file.`);
-      process.exit(1);
+      errorLog.push(`LAW 2 BREACH: Engine flagged '${finding.filePath}' as MUTED but Webpack actively compiled this file.`);
+      pipelineFailed = true;
     }
 
-    // Uniqueness bound: prevent dual states for the same file
+    // Uniqueness check
     if (engineFiles.has(normalizedPath)) {
-      console.error(`🚨 MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times.`);
-      process.exit(1);
+      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times in the engine output.`);
+      pipelineFailed = true;
     }
 
     engineFiles.add(normalizedPath);
     totalRecordsChecked++;
   }
 
-  // Completeness guardrail: ensure the engine did not drop source files Webpack tracked
+  // 2. Accumulate completeness gaps
   for (const webpackModule of clientCompiledSet) {
     if (webpackModule.includes('packages/evershop/src') && !engineFiles.has(webpackModule)) {
-      console.error(`🚨 COMPLETENESS BREACH: Webpack compiled source file '${webpackModule}', but the engine skipped evaluating it.`);
-      process.exit(1);
+      errorLog.push(`COMPLETENESS BREACH: Webpack compiled source file '${webpackModule}' but the engine skipped evaluating it.`);
+      pipelineFailed = true;
     }
   }
 
-  // Distribution bound: prevent blank or fully monochrome flatline
-  if (counts.REACHABLE === 0 || counts.MUTED === 0) {
-    console.error(`🚨 TRIVIAL PAYLOAD BREACH: Engine failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}.`);
+  // 3. Evaluate statistical distribution
+  if (totalRecordsChecked > 0 && (counts.REACHABLE === 0 || counts.MUTED === 0)) {
+    errorLog.push(`TRIVIAL PAYLOAD BREACH: Engine failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}.`);
+    pipelineFailed = true;
+  }
+
+  // Handle final reporting
+  if (pipelineFailed) {
+    console.error(`\n🚨 PHASE 2 FAILED: Engine logic validation failed with ${errorLog.length} breach(es):`);
+    errorLog.forEach((err, index) => {
+      console.error(`  [${index + 1}] ${err}`);
+    });
+    console.error("\n❌ Pipeline terminated due to logic errors.");
     process.exit(1);
   }
 
-  console.log(`\n✅ SUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} matrix records.`);
+  console.log("✅ PHASE 2 PASSED: Graph intersection matches live Webpack compilation telemetry.");
+  console.log(`\n🎉 SUCCESS: Security Pipeline Logic Safely Validated Across ${totalRecordsChecked} Matrix Records.`);
   process.exit(0);
 }
 

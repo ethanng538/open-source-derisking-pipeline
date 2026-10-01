@@ -29,4 +29,4 @@ jobs:
           echo '{"findings": []}' > reachability-results.json
 
       - name: Execute safety net assertion harness
-        run: node .github/security-rules/reachability-engine-validator.js
+        run: node .github/security-rules/reachability-engine-validator.cjs
