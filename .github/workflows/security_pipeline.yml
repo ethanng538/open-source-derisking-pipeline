@@ -32,12 +32,13 @@ jobs:
         env:
           COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: |
+          # Runs the native SWC transpiler pass to build localized file distributions
           npm run compile
-          echo "=== Verification check: post-compile file size ==="
-          ls -la ${{ github.workspace }}/compilation-graph.json
           
+          # Runs the Webpack bundling pass which invokes inline telemetry hooks
           npm run build:stats
-          echo "=== Verification check: post-build:stats file size ==="
+          
+          echo "=== Verification check: post-compile telemetry graph size ==="
           ls -la ${{ github.workspace }}/compilation-graph.json
 
       - name: Inject baseline proof mocks
