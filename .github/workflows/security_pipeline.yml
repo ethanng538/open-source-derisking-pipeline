@@ -33,7 +33,12 @@ jobs:
           COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: |
           npm run compile
+          echo "=== Verification check: post-compile file size ==="
+          ls -la ${{ github.workspace }}/compilation-graph.json
+          
           npm run build:stats
+          echo "=== Verification check: post-build:stats file size ==="
+          ls -la ${{ github.workspace }}/compilation-graph.json
 
       - name: Inject baseline proof mocks
         run: |
