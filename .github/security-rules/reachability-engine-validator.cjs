@@ -27,23 +27,20 @@ function runSafetyNet() {
     process.exit(1);
   }
 
-  // Phase 1 structural validation passed if we made it here
   console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
 
-  console.log("\n=== Phase 2: Reachable vulnerability check ===");
+  console.log("\n=== Phase 2: Invariant Matrix Telemetry Verification ===");
   if (!fs.existsSync('compilation-graph.json')) {
-    console.error("🚨 PHASE 2 CRITICAL: 'compilation-graph.json' not found. Webpack stats are missing.");
+    console.error("🚨 PHASE 2 CRITICAL: 'compilation-graph.json' not found. Compiler telemetry graph is missing.");
     process.exit(1);
   }
 
   const webpackGraph = safeReadJson('compilation-graph.json');
 
-  // Extract and normalise pathways compiled by Webpack
-  const clientCompiledSet = new Set(
-    (webpackGraph.modules || [])
-      .map(m => m.name ? path.normalize(m.name).replace(/^.*node_modules[\\/]/, '') : null)
-      .filter(Boolean)
-  );
+  const compiledAssetGraph = new Set([
+    ...(webpackGraph.frontend || []),
+    ...(webpackGraph.backend || [])
+  ].map(p => path.normalize(p)));
 
   const engineFiles = new Set();
   let totalRecordsChecked = 0;
@@ -58,24 +55,24 @@ function runSafetyNet() {
     }
 
     const normalisedPath = path.normalize(finding.filePath);
-    const fileInWebpack = clientCompiledSet.has(normalisedPath);
+    const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
     counts[finding.status] = (counts[finding.status] || 0) + 1;
 
-    // Reachable files must be inside Webpack's compiled graph as invariant logic
-    if (finding.status === 'REACHABLE' && !fileInWebpack) {
-      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it does not exist in Webpack.`);
-      pipelineFailed = true;
-    }
-
-    // Muted files must not be inside Webpack's compiled graph as invariant logic
-    if (finding.status === 'MUTED' && fileInWebpack) {
-      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as MUTED but Webpack actively compiled this file.`);
-      pipelineFailed = true;
-    }
-
-    // Uniqueness check
+    // Multi-state breach check
     if (engineFiles.has(normalisedPath)) {
       errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times in the engine output.`);
+      pipelineFailed = true;
+    }
+
+    // Inclusion (Reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
+    if (finding.status === 'REACHABLE' && !isAssetCompiled) {
+      errorLog.push(`TELEMETRY GRAPH BREACH (Inclusion Failed): Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      pipelineFailed = true;
+    }
+
+    // Exclusion (Muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
+    if (finding.status === 'MUTED' && isAssetCompiled) {
+      errorLog.push(`TELEMETRY GRAPH BREACH (Exclusion Failed): Engine flagged '${finding.filePath}' as MUTED/Dead-Code, but it actively exists inside the shipping compiled assets.`);
       pipelineFailed = true;
     }
 
@@ -87,10 +84,11 @@ function runSafetyNet() {
     totalRecordsChecked++;
   }
 
-  // Accumulate completeness gaps
-  for (const webpackModule of clientCompiledSet) {
-    if (webpackModule.includes('packages/evershop/src') && !engineFiles.has(webpackModule)) {
-      errorLog.push(`COMPLETENESS BREACH: Webpack compiled source file '${webpackModule}' but the engine skipped evaluating it.`);
+  // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
+  for (const compiledAsset of compiledAssetGraph) {
+    // Audit target is restricted to our internal application source footprint
+    if (compiledAsset.includes(path.join('packages', 'evershop', 'src')) && !engineFiles.has(compiledAsset)) {
+      errorLog.push(`COMPLETENESS BREACH: The compiler bundled source file '${compiledAsset}', but the analysis engine completely bypassed evaluating it.`);
       pipelineFailed = true;
     }
   }
@@ -103,15 +101,15 @@ function runSafetyNet() {
 
   // Handle final reporting
   if (pipelineFailed) {
-    console.error(`🚨 PHASE 2 FAILED: Engine logic validation failed with ${errorLog.length} breach(es):`);
+    console.error(`\n🚨 PHASE 2 FAILED: Invariant Matrix validation failed with ${errorLog.length} breach(es):`);
     errorLog.forEach((err, index) => {
       console.error(`  [${index + 1}] ${err}`);
     });
-    console.error("\n❌ Pipeline terminated due to logic errors.");
+    console.error("\n❌ Pipeline terminated due to compilation telemetry alignment violations.");
     process.exit(1);
   }
 
-  console.log("✅ PHASE 2 PASSED: Graph intersection matches live Webpack compilation telemetry.\n");
+  console.log("✅ PHASE 2 PASSED: Live graph intersection matches live compiler telemetry mapping.\n");
 
   if (warningLog.length > 0) {
     console.warn(`⚠️  ENGINE ALERT: Triage required for ${warningLog.length} unresolved dynamic/wildcard reference(s):`);
