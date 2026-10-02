@@ -40,4 +40,6 @@ jobs:
           echo '{"findings": []}' > reachability-results.json
 
       - name: Execute safety net assertion harness
+        env:
+          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: node .github/security-rules/reachability-engine-validator.cjs

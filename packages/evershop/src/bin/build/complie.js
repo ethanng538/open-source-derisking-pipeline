@@ -8,7 +8,10 @@ const { webpack } = pkg;
 import fs from 'fs';
 import path from 'path';
 
-function runOne(config) {
+
+function runOne(config, buildTrack) {
+
+
   const compiler = webpack(config);
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
@@ -81,12 +84,12 @@ export async function compile(routes) {
   // is ~max(client, server) and the build fits within a ~2GB heap. (Wall time is
   // not worse — the concurrent run oversubscribed the CPU during minification.)
   // See specifications/store-front-architecture-audit.md.
-  await runOne(createConfigClient(routes));
+  await runOne(createConfigClient(routes), 'frontend');
   // Hint V8 to reclaim the client compilation before the server build allocates.
   // No-op unless started with --expose-gc; on memory-limited hosts the default
   // heap cap already forces this collection under pressure.
   if (global.gc) {
     global.gc();
   }
-  return runOne(createConfigServer(routes));
+  return runOne(createConfigServer(routes), 'backend');
 }

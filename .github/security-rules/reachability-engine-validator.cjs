@@ -38,7 +38,7 @@ function runSafetyNet() {
     process.exit(1);
   }
 
-  const webpackGraph = safeReadJson('compilation-graph.json');
+  const webpackGraph = safeReadJson(graphPath);
 
   const compiledAssetGraph = new Set([
     ...(webpackGraph.frontend || []),
