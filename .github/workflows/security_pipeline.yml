@@ -29,13 +29,14 @@ jobs:
           echo "module.exports = {};" > config/production.js
 
       - name: Compile live codebase graph
+        env:
+          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: |
           npm run compile
           npm run build:stats
 
       - name: Inject baseline proof mocks
         run: |
-          echo '{"modules": [{"name": "packages/evershop/src/index.ts"}]}' > compilation-graph.json
           echo '{"findings": []}' > reachability-results.json
 
       - name: Execute safety net assertion harness

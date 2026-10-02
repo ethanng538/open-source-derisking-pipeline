@@ -10,6 +10,7 @@ function safeReadJson(filePath) {
   }
 }
 
+
 function runSafetyNet() {
   let pipelineFailed = false;
   const errorLog = [];
@@ -30,8 +31,10 @@ function runSafetyNet() {
   console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
 
   console.log("\n=== Phase 2: Invariant Matrix Telemetry Verification ===");
-  if (!fs.existsSync('compilation-graph.json')) {
-    console.error("🚨 PHASE 2 CRITICAL: 'compilation-graph.json' not found. Compiler telemetry graph is missing.");
+  const graphPath = process.env.COMPILATION_GRAPH_PATH || 'compilation-graph.json';
+
+  if (!fs.existsSync(graphPath)) {
+    console.error(`🚨 PHASE 2 CRITICAL: '${graphPath}' not found. Compiler telemetry graph is missing.`);
     process.exit(1);
   }
 
@@ -86,7 +89,7 @@ function runSafetyNet() {
 
   // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
   for (const compiledAsset of compiledAssetGraph) {
-    // Audit target is restricted to our internal application source footprint
+    // The audit target is restricted to the internal application source footprint
     if (compiledAsset.includes(path.join('packages', 'evershop', 'src')) && !engineFiles.has(compiledAsset)) {
       errorLog.push(`COMPLETENESS BREACH: The compiler bundled source file '${compiledAsset}', but the analysis engine completely bypassed evaluating it.`);
       pipelineFailed = true;

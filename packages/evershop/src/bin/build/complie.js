@@ -13,29 +13,38 @@ function runOne(config) {
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
 
+
       if (stats && !stats.hasErrors()) {
         try {
           const statsJson = stats.toJson({ all: false, modules: true });
-          const targetOutput = path.join(process.cwd(), 'compilation-graph.json');
+          const targetOutput = process.env.COMPILATION_GRAPH_PATH
+            ? path.resolve(process.env.COMPILATION_GRAPH_PATH)
+            : path.join(process.cwd(), 'compilation-graph.json');
 
           const compiledModules = (statsJson.modules || [])
-            .filter(m => m.name)
-            .map(m => ({ name: m.name }));
+            .map(m => m.name)
+            .filter(name => name && !name.includes('node_modules'))
+            .map(name => {
+              const cleanPath = name.split('!').pop();
+              return path.normalize(path.relative(process.cwd(), cleanPath));
+            });
 
-          let existingData = { modules: [] };
+          let existingData = { frontend: [], backend: [] };
           if (fs.existsSync(targetOutput)) {
             try {
               existingData = JSON.parse(fs.readFileSync(targetOutput, 'utf8'));
             } catch (e) {
-              // Silent fail
+              // Logs corrupt or unparseable target JSON files
+              error(`Failed to parse existing graph at ${targetOutput}: ${e.message}`);
             }
           }
 
-          const combined = [...(existingData.modules || []), ...compiledModules];
-          const unique = Array.from(new Set(combined.map(m => m.name))).map(name => ({ name }));
+          const combined = [...(existingData[buildTrack] || []), ...compiledModules];
+          existingData[buildTrack] = Array.from(new Set(combined));
 
-          fs.writeFileSync(targetOutput, JSON.stringify({ modules: unique }, null, 2), 'utf8');
+          fs.writeFileSync(targetOutput, JSON.stringify(existingData, null, 2), 'utf8');
         } catch (dumpError) {
+          error(`Telemetry compilation graph error: ${dumpError.stack || dumpError}`);
         }
       }
 
