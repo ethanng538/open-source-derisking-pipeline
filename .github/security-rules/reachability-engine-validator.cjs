@@ -121,7 +121,7 @@ function runSafetyNet() {
     console.warn("");
   }
 
-  console.log(`\n🎉 SUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} matrix records.`);
+  console.log(`\nSUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} matrix records.`);
   process.exit(0);
 }
 
