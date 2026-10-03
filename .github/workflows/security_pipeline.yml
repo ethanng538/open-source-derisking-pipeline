@@ -48,7 +48,7 @@ jobs:
           FRONTEND_COUNT=$(jq '.frontend | length' ${{ github.workspace }}/compilation-graph.json)
           BACKEND_COUNT=$(jq '.backend | length' ${{ github.workspace }}/compilation-graph.json)
           
-          echo "📊 Telemetry Summary:"
+          echo "📊 Telemetry summary:"
           echo "  - Frontend tracked files: $FRONTEND_COUNT"
           echo "  - Backend tracked files:  $BACKEND_COUNT"
           
@@ -70,3 +70,14 @@ jobs:
         env:
           COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: node .github/security-rules/reachability-engine-validator.cjs
+
+      - name: Archive telemetry artefacts & validator diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appsec-telemetry-diagnostics
+          retention-days: 7
+          path: |
+            ${{ github.workspace }}/compilation-graph.json
+            ${{ github.workspace }}/reachability-results.json
+            ${{ github.workspace }}/validator-diagnostics.json

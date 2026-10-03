@@ -112,6 +112,22 @@ function runSafetyNet() {
     process.exit(1);
   }
 
+  const diagnosticPayload = {
+    timestamp: new Date().toISOString(),
+    counts: counts,
+    totalChecked: totalRecordsChecked,
+    errors: errorLog,
+    warnings: warningLog,
+    webpackGraphSize: compiledAssetGraph.size,
+    engineFilesSize: engineFiles.size
+  };
+
+  fs.writeFileSync(
+    path.join(process.cwd(), 'validator-diagnostics.json'),
+    JSON.stringify(diagnosticPayload, null, 2),
+    'utf8'
+  );
+
   console.log("✅ PHASE 2 PASSED: Live graph intersection matches live compiler telemetry mapping.\n");
 
   if (warningLog.length > 0) {
