@@ -5,7 +5,7 @@ function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (err) {
-    console.error(`🚨 CRITICAL CONFIG ERROR: Failed to read or parse file at ${filePath}`);
+    console.error(`CONFIG ERROR: Failed to read or parse file at ${filePath}`);
     process.exit(1);
   }
 }
@@ -17,24 +17,24 @@ function runSafetyNet() {
   const warningLog = [];
 
   console.log("=== Phase 1: Structural validation ===");
-  if (!fs.existsSync('reachability-results.json')) {
-    console.error("🚨 PHASE 1 CRITICAL: 'reachability-results.json' not found. Engine did not run.");
+  if (!fs.existsSync('vulnerable-dependencies.json')) {
+    console.error("PHASE 1 ERROR: 'vulnerable-dependencies.json' not found. Engine did not run.");
     process.exit(1);
   }
 
-  const engineOutput = safeReadJson('reachability-results.json');
+  const engineOutput = safeReadJson('vulnerable-dependencies.json');
   if (!engineOutput.findings || !Array.isArray(engineOutput.findings)) {
-    console.error("🚨 PHASE 1 CRITICAL: Engine payload is missing a valid 'findings' array.");
+    console.error("PHASE 1 ERROR: Engine payload is missing a valid 'findings' array.");
     process.exit(1);
   }
 
   console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
 
-  console.log("\n=== Phase 2: Invariant Matrix Telemetry Verification ===");
+  console.log("\n=== Phase 2: Reachability verification ===");
   const graphPath = process.env.COMPILATION_GRAPH_PATH || 'compilation-graph.json';
 
   if (!fs.existsSync(graphPath)) {
-    console.error(`🚨 PHASE 2 CRITICAL: '${graphPath}' not found. Compiler telemetry graph is missing.`);
+    console.error(`PHASE 2 ERROR: '${graphPath}' not found. Compiler telemetry graph is missing.`);
     process.exit(1);
   }
 
@@ -166,7 +166,7 @@ function runSafetyNet() {
     console.warn("");
   }
 
-  console.log(`\nSUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} matrix records.`);
+  console.log(`\nSUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} records.`);
   process.exit(0);
 }
 

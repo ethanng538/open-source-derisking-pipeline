@@ -26,7 +26,7 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
 }
 
 function runIndependentEngine() {
-  console.log("Running vulnerable package finder...");
+  console.log("Running vulnerable dependency finder...");
 
   if (!fs.existsSync('npm-audit.json')) {
     console.error("FINDER ERROR: Missing npm-audit.json");
@@ -74,7 +74,7 @@ function runIndependentEngine() {
     findings: findings
   };
 
-  fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');
+  fs.writeFileSync('vulnerable-dependencies.json', JSON.stringify(outputPayload, null, 2), 'utf8');
   console.log(`✅ Results generated with ${findings.length} target modules to evaluate.`);
 }
 
