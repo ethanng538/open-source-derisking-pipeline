@@ -34,33 +34,28 @@ function runOne(config) {
 
         let compiledModules = [];
         try {
-          const statsJson = stats.toJson({ all: false, modules: true });
-          const rawModuleList = statsJson.modules || [];
-          const collectedNames = [];
+          const uniqueDiskPaths = new Set();
 
-          // Helper to crawl and pull dependencies out of concatenated scopes
-          const extractNames = (mod) => {
-            if (mod.name) collectedNames.push(mod.name);
-            if (mod.modules && Array.isArray(mod.modules)) {
-              mod.modules.forEach(extractNames); // Safely captures nested, unpruned files
+          const rawModules = stats.compilation.modules || [];
+
+          rawModules.forEach(mod => {
+            let absoluteResource = mod.resource;
+
+            if (!absoluteResource && mod.modules && Array.isArray(mod.modules)) {
+              mod.modules.forEach(subMod => {
+                if (subMod.resource) uniqueDiskPaths.add(subMod.resource);
+              });
+              return;
             }
-          };
 
-          rawModuleList.forEach(extractNames);
+            if (!absoluteResource) return;
 
-          compiledModules = collectedNames
-            .filter(name => {
-              if (!name) return false;
-              if (!name.includes('node_modules')) return true;
-              return name.includes('@evershop');
-              })
-            .map(name => {
-              const cleanPath = name.split('!').pop().split('?')[0];
-              const absolutePath = path.isAbsolute(cleanPath)
-                ? cleanPath
-                : path.resolve(process.cwd(), cleanPath);
+            uniqueDiskPaths.add(absoluteResource);
+          });
 
-              return path.normalize(path.relative(process.cwd(), absolutePath));
+          compiledModules = Array.from(uniqueDiskPaths)
+            .map(rawPath => {
+              return path.normalize(path.relative(process.cwd(), rawPath));
             });
 
         } catch (dumpError) {
