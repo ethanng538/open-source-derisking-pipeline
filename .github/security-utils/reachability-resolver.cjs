@@ -53,7 +53,7 @@ function runResolutionEngine() {
   };
 
   fs.writeFileSync('reachability-results.json', JSON.stringify(structuredOutput, null, 2), 'utf8');
-  console.log(`✅ Mapping complete. Extracted ${thirdPartyReachable.length} live risks linked to application source.`);
+  console.log(`✅ Mapping complete. Resolved ${thirdPartyReachable.length} live risks linked to application source.`);
 }
 
 runResolutionEngine();

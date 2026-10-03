@@ -69,15 +69,15 @@ jobs:
       - name: Find vulnerable dependency files
         run: node .github/security-utils/find-vulnerabilities.cjs
 
-      - name: Execute safety net assertion harness
-        env:
-          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
-        run: node .github/security-rules/reachability-engine-validator.cjs
-
       - name: Resolve reachable vulnerabilities
         env:
           COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
         run: node .github/security-utils/reachability-resolver.cjs
+
+      - name: Validate reachability results
+        env:
+          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
+        run: node .github/security-rules/reachability-engine-validator.cjs
 
       - name: Archive telemetry artefacts & validator diagnostics
         if: always()
@@ -88,5 +88,5 @@ jobs:
           path: |
             ${{ github.workspace }}/compilation-graph.json
             ${{ github.workspace }}/vulnerable-dependencies.json
-            ${{ github.workspace }}/validator-diagnostics.json
             ${{ github.workspace }}/reachability-results.json
+            ${{ github.workspace }}/validator-diagnostics.json

@@ -78,23 +78,31 @@ function runSafetyNet() {
 
     counts[effectiveStatus] = (counts[effectiveStatus] || 0) + 1;
 
-    // Inclusion (Reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
+    // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
       errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
-    // Exclusion (Muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
+    // Exclusion (muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
     if (effectiveStatus === 'MUTED' && isAssetCompiled) {
       errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as MUTED but it actively exists inside compiled assets.`);
       pipelineFailed = true;
     }
 
-    if (effectiveStatus === 'WARNING') {
-      warningLog.push(`Unresolved dynamic reference or wildcard evaluation found in: '${finding.filePath}'`);
-    }
-
     engineFiles.add(normalisedPath);
+    totalRecordsChecked++;
+  }
+
+  const filesWithAmbiguousImports = webpackGraph.dynamicExpressionOrigins || [];
+
+  for (const warningFile of filesWithAmbiguousImports) {
+    const normalisedWarnPath = path.normalize(warningFile);
+
+    counts.WARNING++;
+    warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${warningFile}'`);
+
+    engineFiles.add(normalisedWarnPath);
     totalRecordsChecked++;
   }
 
@@ -166,6 +174,20 @@ function runSafetyNet() {
     console.warn("");
   }
 
+  console.log(`📊 Validation summary`);
+  console.log(`Total evaluated: ${totalRecordsChecked} target packages`);
+  console.log("---");
+  console.log(`🟢 MUTED risks: ${counts.MUTED} (pruned or non-compiled code)`);
+  console.log(`⚠️  WARNINGS: ${counts.WARNING} (dynamic imports needing human audit)`);
+
+  if (counts.REACHABLE > 0) {
+    console.log(`🔴 REACHABLE risks:  ${counts.REACHABLE} (vulnerable packages built into binary)`);
+    console.log("\nACTION RECOMMENDED:");
+    console.log("Check 'reachability-results.json' to cross-reference the reachable");
+    console.log("packages and execute version updates to clear production threats.");
+  } else {
+    console.log(`🔵 REACHABLE risks: ${counts.REACHABLE} (zero live vulnerabilities deployed)`);
+  }
   console.log(`\nSUCCESS: Security pipeline logic safely validated across ${totalRecordsChecked} records.`);
   process.exit(0);
 }

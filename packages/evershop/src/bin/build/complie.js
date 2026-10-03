@@ -38,10 +38,13 @@ function runOne(config) {
         }
 
         let compiledModules = [];
+        let dynamicWarnings = [];
+
         try {
           const uniqueDiskPaths = new Set();
 
           const rawModules = stats.compilation.modules || [];
+          const rawWarnings = stats.compilation.warnings || [];
 
           rawModules.forEach(mod => {
             let absoluteResource = mod.resource;
@@ -52,6 +55,19 @@ function runOne(config) {
               });
               return;
             }
+
+            rawWarnings.forEach(warn => {
+              if (warn.message && warn.message.includes('Critical dependency: the request of a dependency is an expression')) {
+                let ambiguousFileOrigin = "Unknown Origin Context";
+
+                if (warn.module && warn.module.resource) {
+                  ambiguousFileOrigin = path.normalize(path.relative(process.cwd(), warn.module.resource));
+                }
+
+                dynamicWarnings.push(ambiguousFileOrigin);
+              }
+            });
+
 
             if (!absoluteResource) return;
 
@@ -67,7 +83,7 @@ function runOne(config) {
           error(`Telemetry compilation graph parsing error: ${dumpError.stack || dumpError}`);
         }
 
-        resolve({ stats, compiledModules });
+        resolve({ stats, compiledModules, dynamicWarnings });
       });
     });
   });
@@ -107,7 +123,11 @@ export async function compile(routes) {
     backend: Array.from(new Set(serverResult.compiledModules)),
     appSource: Array.from(allBundledPaths).filter(p =>
       p.includes(path.join('packages', 'evershop', 'src'))
-    )
+    ),
+    unresolvedDynamicImports: Array.from(new Set([
+      ...clientResult.dynamicWarnings,
+      ...serverResult.dynamicWarnings
+    ]))
   };
 
   const targetOutput = process.env.COMPILATION_GRAPH_PATH
