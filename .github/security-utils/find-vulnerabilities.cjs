@@ -8,23 +8,6 @@ function safeReadJson(filePath) {
   }
 }
 
-// Helper to recursively find all files in a package directory
-function getAllFiles(dirPath, arrayOfFiles = []) {
-  if (!fs.existsSync(dirPath)) return arrayOfFiles;
-  const files = fs.readdirSync(dirPath);
-
-  files.forEach(file => {
-    const filePath = path.join(dirPath, file);
-    if (fs.statSync(filePath).isDirectory()) {
-      arrayOfFiles = getAllFiles(filePath, arrayOfFiles);
-    } else {
-      const relativePath = path.normalize(path.relative(process.cwd(), filePath));
-      arrayOfFiles.push(relativePath);
-    }
-  });
-  return arrayOfFiles;
-}
-
 function runIndependentEngine() {
   console.log("Running vulnerable dependency finder...");
 

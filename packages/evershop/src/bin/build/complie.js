@@ -56,22 +56,21 @@ function runOne(config) {
               return;
             }
 
-            rawWarnings.forEach(warn => {
-              if (warn.message && warn.message.includes('Critical dependency: the request of a dependency is an expression')) {
-                let ambiguousFileOrigin = "Unknown Origin Context";
-
-                if (warn.module && warn.module.resource) {
-                  ambiguousFileOrigin = path.normalize(path.relative(process.cwd(), warn.module.resource));
-                }
-
-                dynamicWarnings.push(ambiguousFileOrigin);
-              }
-            });
-
-
             if (!absoluteResource) return;
 
             uniqueDiskPaths.add(absoluteResource);
+          });
+
+          rawWarnings.forEach(warn => {
+            if (warn.message && warn.message.includes('Critical dependency: the request of a dependency is an expression')) {
+              let ambiguousFileOrigin = "Unknown Origin Context";
+
+              if (warn.module && warn.module.resource) {
+                ambiguousFileOrigin = path.normalize(path.relative(process.cwd(), warn.module.resource));
+              }
+
+              dynamicWarnings.push(ambiguousFileOrigin);
+            }
           });
 
           compiledModules = Array.from(uniqueDiskPaths)
