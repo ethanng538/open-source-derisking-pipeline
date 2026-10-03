@@ -8,7 +8,7 @@ function safeReadJson(filePath) {
   }
 }
 
-function runIndependentEngine() {
+function findVulnerableDependencies() {
   console.log("Running vulnerable dependency finder...");
 
   if (!fs.existsSync('npm-audit.json')) {
@@ -61,4 +61,4 @@ function runIndependentEngine() {
   console.log(`✅ Results generated with ${findings.length} target modules to evaluate.`);
 }
 
-runIndependentEngine();
+findVulnerableDependencies();

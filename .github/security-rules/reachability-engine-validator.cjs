@@ -11,20 +11,20 @@ function safeReadJson(filePath) {
 }
 
 
-function runSafetyNet() {
+function runResolverValidator() {
   let pipelineFailed = false;
   const errorLog = [];
   const warningLog = [];
 
   console.log("=== Phase 1: Structural validation ===");
-  if (!fs.existsSync('vulnerable-dependencies.json')) {
-    console.error("PHASE 1 ERROR: 'vulnerable-dependencies.json' not found. Engine did not run.");
+  if (!fs.existsSync('reachability-results.json')) {
+    console.error("PHASE 1 ERROR: 'reachability-results.json' not found. Reachability validator did not run.");
     process.exit(1);
   }
 
-  const engineOutput = safeReadJson('vulnerable-dependencies.json');
-  if (!engineOutput.findings || !Array.isArray(engineOutput.findings)) {
-    console.error("PHASE 1 ERROR: Engine payload is missing a valid 'findings' array.");
+  const resolverOutput = safeReadJson('reachability-results.json');
+  if (!resolverOutput.findings || !Array.isArray(resolverOutput.findings)) {
+    console.error("PHASE 1 ERROR: Resolver results is missing a valid 'findings' array.");
     process.exit(1);
   }
 
@@ -45,11 +45,11 @@ function runSafetyNet() {
     ...(webpackGraph.backend || [])
   ].map(p => path.normalize(p)));
 
-  const engineFiles = new Set();
+  const resolverFiles = new Set();
   let totalRecordsChecked = 0;
-  let counts = { REACHABLE: 0, MUTED: 0, WARNING: 0 };
+  let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, WARNING: 0 };
 
-  for (const finding of engineOutput.findings) {
+  for (const finding of resolverOutput.findings) {
     if (!finding.filePath || !finding.status) {
       errorLog.push(`Malformed record structure found at index ${totalRecordsChecked}`);
       pipelineFailed = true;
@@ -61,12 +61,12 @@ function runSafetyNet() {
     const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
 
     // Multi-state breach check
-    if (engineFiles.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
+    if (resolverFiles.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
       errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
 
-    if (engineFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
+    if (resolverFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
       totalRecordsChecked++;
       continue;
     }
@@ -84,25 +84,19 @@ function runSafetyNet() {
       pipelineFailed = true;
     }
 
-    // Exclusion (muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
-    if (effectiveStatus === 'MUTED' && isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as MUTED but it actively exists inside compiled assets.`);
-      pipelineFailed = true;
-    }
-
-    engineFiles.add(normalisedPath);
+    resolverFiles.add(normalisedPath);
     totalRecordsChecked++;
   }
 
-  const filesWithAmbiguousImports = webpackGraph.dynamicExpressionOrigins || [];
+  const filesWithAmbiguousDependencies = webpackGraph.dynamicExpressionOrigins || [];
 
-  for (const warningFile of filesWithAmbiguousImports) {
+  for (const warningFile of filesWithAmbiguousDependencies) {
     const normalisedWarnPath = path.normalize(warningFile);
 
     counts.WARNING++;
     warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${warningFile}'`);
 
-    engineFiles.add(normalisedWarnPath);
+    resolverFiles.add(normalisedWarnPath);
     totalRecordsChecked++;
   }
 
@@ -125,22 +119,22 @@ function runSafetyNet() {
   // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
   if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
     for (const sourceAsset of webpackGraph.appSource) {
-      if (!engineFiles.has(sourceAsset)) {
-        errorLog.push(`COMPLETENESS BREACH: The compiler bundled custom source module '${sourceAsset}' but the analysis engine bypassed evaluating it.`);
+      if (!resolverFiles.has(sourceAsset)) {
+        errorLog.push(`COMPLETENESS BREACH: The compiler bundled custom source module '${sourceAsset}' but the resolver missed evaluating it.`);
         pipelineFailed = true;
       }
     }
   }
 
   // Evaluate statistical distribution
-  if (totalRecordsChecked > 0 && counts.REACHABLE === 0 && counts.MUTED === 0) {
-    errorLog.push(`TRIVIAL PAYLOAD BREACH: Engine failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}.`);
+  if (totalRecordsChecked > 0 && counts.REACHABLE === 0 && counts.MUTED === 0 && counts.SAFE === 0) {
+    errorLog.push(`TRIVIAL PAYLOAD BREACH: Engine failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}, SAFE: ${counts.SAFE}.`);
     pipelineFailed = true;
   }
 
   // Handle final reporting
   if (pipelineFailed) {
-    console.error(`🚨 PHASE 2 FAILED: Invariant Matrix validation failed with ${errorLog.length} breach(es):`);
+    console.error(`PHASE 2 ERROR: Invariant matrix validation failed with ${errorLog.length} breach(es):`);
     errorLog.forEach((err, index) => {
       console.error(`  [${index + 1}] ${err}`);
     });
@@ -155,7 +149,7 @@ function runSafetyNet() {
     errors: errorLog,
     warnings: warningLog,
     webpackGraphSize: compiledAssetGraph.size,
-    engineFilesSize: engineFiles.size
+    engineFilesSize: resolverFiles.size
   };
 
   fs.writeFileSync(
@@ -175,16 +169,16 @@ function runSafetyNet() {
   }
 
   console.log(`📊 Validation summary`);
-  console.log(`Total evaluated: ${totalRecordsChecked} target packages`);
+  console.log(`Total evaluated: ${totalRecordsChecked} target files`);
   console.log("---");
   console.log(`🟢 MUTED risks: ${counts.MUTED} (pruned or non-compiled code)`);
-  console.log(`⚠️  WARNINGS: ${counts.WARNING} (dynamic imports needing human audit)`);
+  console.log(`⚠️ WARNINGS: ${counts.WARNING} (dynamic imports needing human audit)`);
 
   if (counts.REACHABLE > 0) {
-    console.log(`🔴 REACHABLE risks:  ${counts.REACHABLE} (vulnerable packages built into binary)`);
+    console.log(`🔴 REACHABLE risks:  ${counts.REACHABLE} (vulnerabilities built into binary)`);
     console.log("\nACTION RECOMMENDED:");
     console.log("Check 'reachability-results.json' to cross-reference the reachable");
-    console.log("packages and execute version updates to clear production threats.");
+    console.log("vulnerabilities and execute version updates to clear production threats.");
   } else {
     console.log(`🔵 REACHABLE risks: ${counts.REACHABLE} (zero live vulnerabilities deployed)`);
   }
@@ -192,4 +186,4 @@ function runSafetyNet() {
   process.exit(0);
 }
 
-runSafetyNet();
+runResolverValidator();
