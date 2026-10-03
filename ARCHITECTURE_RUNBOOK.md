@@ -42,3 +42,8 @@ telemetry through three automated checks:
 -   **Telemetry graph match:** The script merges the distinct frontend and backend compilation arrays into a single, unified tracking set. If a file is marked as `REACHABLE` but is missing from this active build graph, or is marked as `MUTED` but actively exists inside it, the pipeline flags a logic breach and halts.
 -   **Environment-agnostic routing:** By validating files based on what the compilers actually did with them rather than guessing their subsystem context based on folder paths, the pipeline remains completely immune to edge cases caused by mixed full-stack directories.
 -   **Completeness reverse-audit:** To prevent the analysis engine from taking shortcuts or skipping heavy modules to save execution time, the script performs a reverse sweep. It verifies that every single file actively bundled by the compiler has a corresponding record in the engine's payload, terminating the pipeline if any deployed asset was bypassed.
+
+## 📍 Phase 2: Finding Reachable Vulnerabilities
+
+## The Objective
+The safety net identifies all compiled files. 

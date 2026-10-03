@@ -1,7 +1,7 @@
 # Dependency Vulnerability Reachability Pipeline
 
 > ## 📢 The Architectural Strategy
-> This repository documents a self-directed architectural deep dive into reachability-driven vulnerability validation.
+> This repository documents a self-directed architectural deep dive into reachability-driven vulnerability detection.
 > The core focus centres on a single engineering challenge: how to design a pipeline that maps application execution
 > flows across a production codebase, explicitly separating active runtime exposure from dead code.
 
@@ -23,7 +23,10 @@ safely eliminated as dead weight or if it successfully made its way into the fin
 ------------------------------
 
 ## 🛠️ System & Pipeline Architecture
-TBA
+My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) repository to provide a real-world
+baseline for my pipeline.
 
-👉 To inspect the custom validation scripts, read the real execution telemetry records or review the step-by-step
-pipeline logging outputs, view the Reachability Pipeline Architecture Runbook.
+
+
+👉 **To inspect the custom validation scripts, read the real execution telemetry records or review the step-by-step
+pipeline logging outputs, view the** [Reachability Pipeline Architecture Runbook](./ARCHITECTURE_RUNBOOK.md).

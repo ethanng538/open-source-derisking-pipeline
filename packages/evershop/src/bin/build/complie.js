@@ -8,68 +8,66 @@ const { webpack } = pkg;
 import fs from 'fs';
 import path from 'path';
 
+function runOne(config) {
 
-function runOne(config, buildTrack) {
+
+  const forcedConfig = {
+    ...config,
+    stats: config.stats || { errorDetails: true, warnings: true }
+  };
 
 
-  const compiler = webpack(config);
+  const compiler = webpack(forcedConfig);
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
 
 
-      if (stats && !stats.hasErrors()) {
-        try {
-          const statsJson = stats.toJson({ all: false, modules: true });
-          const targetOutput = process.env.COMPILATION_GRAPH_PATH
-            ? path.resolve(process.env.COMPILATION_GRAPH_PATH)
-            : path.join(process.cwd(), 'compilation-graph.json');
+      const hasErrors = err || (stats && stats.hasErrors());
 
-          const compiledModules = (statsJson.modules || [])
-            .map(m => m.name)
-            .filter(name => name && !name.includes('node_modules'))
-            .map(name => {
-              const cleanPath = name.split('!').pop();
-              return path.normalize(path.relative(process.cwd(), cleanPath));
-            });
-
-          let existingData = { frontend: [], backend: [] };
-          if (fs.existsSync(targetOutput)) {
-            try {
-              existingData = JSON.parse(fs.readFileSync(targetOutput, 'utf8'));
-            } catch (e) {
-              // Logs corrupt or unparseable target JSON files
-              error(`Failed to parse existing graph at ${targetOutput}: ${e.message}`);
-            }
-          }
-
-          const combined = [...(existingData[buildTrack] || []), ...compiledModules];
-          existingData[buildTrack] = Array.from(new Set(combined));
-
-          fs.writeFileSync(targetOutput, JSON.stringify(existingData, null, 2), 'utf8');
-        } catch (dumpError) {
-          error(`Telemetry compilation graph error: ${dumpError.stack || dumpError}`);
-        }
-      }
-
-
-      // close() releases the compiler's resources (and flushes any persistent
-      // cache). Resolve/reject from inside its callback so the compilation is
-      // fully torn down — and collectable — before the next one starts.
       compiler.close(() => {
-        if (err || stats.hasErrors()) {
-          if (err) {
-            error(err);
-          }
-          error(
-            stats.toString({
-              errorDetails: true,
-              warnings: true
-            })
-          );
-          reject(err);
+        if (hasErrors) {
+          if (err) error(err);
+          if (stats) error(stats.toString());
+          reject(err || new Error('Webpack compilation failed.'));
           return;
         }
-        resolve(stats);
+
+        let compiledModules = [];
+        try {
+          const statsJson = stats.toJson({ all: false, modules: true });
+          const rawModuleList = statsJson.modules || [];
+          const collectedNames = [];
+
+          // Helper to crawl and pull dependencies out of concatenated scopes
+          const extractNames = (mod) => {
+            if (mod.name) collectedNames.push(mod.name);
+            if (mod.modules && Array.isArray(mod.modules)) {
+              mod.modules.forEach(extractNames); // Safely captures nested, unpruned files
+            }
+          };
+
+          rawModuleList.forEach(extractNames);
+
+          compiledModules = collectedNames
+            .filter(name => {
+              if (!name) return false;
+              if (!name.includes('node_modules')) return true;
+              return name.includes('@evershop');
+              })
+            .map(name => {
+              const cleanPath = name.split('!').pop().split('?')[0];
+              const absolutePath = path.isAbsolute(cleanPath)
+                ? cleanPath
+                : path.resolve(process.cwd(), cleanPath);
+
+              return path.normalize(path.relative(process.cwd(), absolutePath));
+            });
+
+        } catch (dumpError) {
+          error(`Telemetry compilation graph parsing error: ${dumpError.stack || dumpError}`);
+        }
+
+        resolve({ stats, compiledModules });
       });
     });
   });
@@ -84,12 +82,36 @@ export async function compile(routes) {
   // is ~max(client, server) and the build fits within a ~2GB heap. (Wall time is
   // not worse — the concurrent run oversubscribed the CPU during minification.)
   // See specifications/store-front-architecture-audit.md.
-  await runOne(createConfigClient(routes), 'frontend');
+
+
+  const clientResult = await runOne(createConfigClient(routes));
+
+
   // Hint V8 to reclaim the client compilation before the server build allocates.
   // No-op unless started with --expose-gc; on memory-limited hosts the default
   // heap cap already forces this collection under pressure.
   if (global.gc) {
     global.gc();
   }
-  return runOne(createConfigServer(routes), 'backend');
+
+
+  const serverResult = await runOne(createConfigServer(routes));
+
+  const finalGraph = {
+    frontend: Array.from(new Set(clientResult.compiledModules)),
+    backend: Array.from(new Set(serverResult.compiledModules))
+  };
+
+  const targetOutput = process.env.COMPILATION_GRAPH_PATH
+    ? path.resolve(process.env.COMPILATION_GRAPH_PATH)
+    : path.join(process.cwd(), 'compilation-graph.json');
+
+  const targetDir = path.dirname(targetOutput);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  fs.writeFileSync(targetOutput, JSON.stringify(finalGraph, null, 2), 'utf8');
+
+  return serverResult.stats;
 }
