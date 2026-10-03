@@ -97,9 +97,17 @@ export async function compile(routes) {
 
   const serverResult = await runOne(createConfigServer(routes));
 
+  const allBundledPaths = new Set([
+    ...clientResult.compiledModules,
+    ...serverResult.compiledModules
+  ]);
+
   const finalGraph = {
     frontend: Array.from(new Set(clientResult.compiledModules)),
-    backend: Array.from(new Set(serverResult.compiledModules))
+    backend: Array.from(new Set(serverResult.compiledModules)),
+    appSource: Array.from(allBundledPaths).filter(p =>
+      p.includes(path.join('packages', 'evershop', 'src'))
+    )
   };
 
   const targetOutput = process.env.COMPILATION_GRAPH_PATH

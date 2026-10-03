@@ -44,19 +44,27 @@ function runIndependentEngine() {
 
   const findings = [];
 
-  // Scans node_modules directly for files belonging to vulnerable packages
+  // Maps each vulnerable package to its exact module entry file
   vulnerablePackages.forEach(pkgName => {
-    // Handles both regular and scoped packages
-    const pkgPath = path.join('node_modules', pkgName);
-    if (fs.existsSync(pkgPath)) {
-      const allPkgFiles = getAllFiles(pkgPath);
+    let resolvedPath = null;
 
-      allPkgFiles.forEach(filePath => {
-        findings.push({
-          filePath: filePath,
-          status: "PENDING_EVALUATION",
-          meta: { package: pkgName }
-        });
+    try {
+      // Resolves the primary entry file used when importing the package
+      const entryPoint = require.resolve(pkgName, { paths: [process.cwd()] });
+      resolvedPath = path.normalize(path.relative(process.cwd(), entryPoint));
+    } catch (e) {
+      // Fall back to the package.json if it is a binary wrapper or unresolvable layout
+      const packageJsonPath = path.join('node_modules', pkgName, 'package.json');
+      if (fs.existsSync(packageJsonPath)) {
+        resolvedPath = path.normalize(packageJsonPath);
+      }
+    }
+
+    if (resolvedPath) {
+      findings.push({
+        filePath: resolvedPath,
+        status: "PENDING_EVALUATION",
+        meta: { package: pkgName }
       });
     }
   });
@@ -67,7 +75,7 @@ function runIndependentEngine() {
   };
 
   fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');
-  console.log(`✅ Results generated with ${findings.length} files with vulnerable dependencies.`);
+  console.log(`✅ Results generated with ${findings.length} target modules to evaluate.`);
 }
 
 runIndependentEngine();

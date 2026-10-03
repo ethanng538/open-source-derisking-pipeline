@@ -80,13 +80,13 @@ function runSafetyNet() {
 
     // Inclusion (Reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`TELEMETRY GRAPH BREACH (Inclusion Failed): Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
     // Exclusion (Muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
     if (effectiveStatus === 'MUTED' && isAssetCompiled) {
-      errorLog.push(`TELEMETRY GRAPH BREACH (Exclusion Failed): Engine flagged '${finding.filePath}' as MUTED/Dead-Code, but it actively exists inside the shipping compiled assets.`);
+      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as MUTED but it actively exists inside compiled assets.`);
       pipelineFailed = true;
     }
 
@@ -115,11 +115,12 @@ function runSafetyNet() {
   }
 
   // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
-  for (const compiledAsset of compiledAssetGraph) {
-    // The audit target is restricted to the internal application source footprint
-    if (compiledAsset.includes(path.join('packages', 'evershop', 'src')) && !engineFiles.has(compiledAsset)) {
-      errorLog.push(`COMPLETENESS BREACH: The compiler bundled source file '${compiledAsset}', but the analysis engine completely bypassed evaluating it.`);
-      pipelineFailed = true;
+  if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
+    for (const sourceAsset of webpackGraph.appSource) {
+      if (!engineFiles.has(sourceAsset)) {
+        errorLog.push(`COMPLETENESS BREACH: The compiler bundled custom source module '${sourceAsset}' but the analysis engine bypassed evaluating it.`);
+        pipelineFailed = true;
+      }
     }
   }
 
