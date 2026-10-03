@@ -59,32 +59,59 @@ function runSafetyNet() {
 
     const normalisedPath = path.normalize(finding.filePath);
     const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
-    counts[finding.status] = (counts[finding.status] || 0) + 1;
 
     // Multi-state breach check
-    if (engineFiles.has(normalisedPath)) {
-      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times in the engine output.`);
+    if (engineFiles.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
+      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
 
+    if (engineFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
+      totalRecordsChecked++;
+      continue;
+    }
+
+    let effectiveStatus = finding.status;
+    if (finding.status === 'PENDING_EVALUATION') {
+      effectiveStatus = isAssetCompiled ? 'REACHABLE' : 'MUTED';
+    }
+
+    counts[effectiveStatus] = (counts[effectiveStatus] || 0) + 1;
+
     // Inclusion (Reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
-    if (finding.status === 'REACHABLE' && !isAssetCompiled) {
+    if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
       errorLog.push(`TELEMETRY GRAPH BREACH (Inclusion Failed): Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
     // Exclusion (Muted): if flagged as dead code or tree-shaken, it cannot actively exist inside the compiled assets.
-    if (finding.status === 'MUTED' && isAssetCompiled) {
+    if (effectiveStatus === 'MUTED' && isAssetCompiled) {
       errorLog.push(`TELEMETRY GRAPH BREACH (Exclusion Failed): Engine flagged '${finding.filePath}' as MUTED/Dead-Code, but it actively exists inside the shipping compiled assets.`);
       pipelineFailed = true;
     }
 
-    if (finding.status === 'WARNING') {
+    if (effectiveStatus === 'WARNING') {
       warningLog.push(`Unresolved dynamic reference or wildcard evaluation found in: '${finding.filePath}'`);
     }
 
     engineFiles.add(normalisedPath);
     totalRecordsChecked++;
+  }
+
+  const auditPath = 'npm-audit.json';
+  let totalAuditVulnerabilities = 0;
+  if (fs.existsSync(auditPath)) {
+    const auditData = safeReadJson(auditPath);
+    totalAuditVulnerabilities = auditData.vulnerabilities ? Object.keys(auditData.vulnerabilities).length : 0;
+  }
+
+  if (totalRecordsChecked === 0) {
+    if (totalAuditVulnerabilities > 0) {
+      errorLog.push(`ZERO RECORD BREACH: The engine evaluated 0 files but 'npm-audit.json' contains ${totalAuditVulnerabilities} active vulnerabilities.`);
+      pipelineFailed = true;
+    } else {
+      console.log(" Zero records found because the project package manifest has 0 vulnerabilities.");
+    }
   }
 
   // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
@@ -104,7 +131,7 @@ function runSafetyNet() {
 
   // Handle final reporting
   if (pipelineFailed) {
-    console.error(`\n🚨 PHASE 2 FAILED: Invariant Matrix validation failed with ${errorLog.length} breach(es):`);
+    console.error(`🚨 PHASE 2 FAILED: Invariant Matrix validation failed with ${errorLog.length} breach(es):`);
     errorLog.forEach((err, index) => {
       console.error(`  [${index + 1}] ${err}`);
     });

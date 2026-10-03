@@ -62,9 +62,11 @@ jobs:
           
           echo "✅ Telemetry graph verified successfully."
 
-      - name: Inject baseline proof mocks
-        run: |
-          echo '{"findings": []}' > reachability-results.json
+      - name: Execute npm audit
+        run: npm audit --json > npm-audit.json || true
+
+      - name: Find files importing vulnerable dependencies
+        run: node .github/security-utils/find-reachable-vulnerabilities.cjs
 
       - name: Execute safety net assertion harness
         env:
