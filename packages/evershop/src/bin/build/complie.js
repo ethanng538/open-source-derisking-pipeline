@@ -18,6 +18,11 @@ function runOne(config) {
 
 
   const compiler = webpack(forcedConfig);
+
+
+  console.log(`🔍 [${compiler.options.name}] Resolved infrastructure targets:`, compiler.options.target);
+
+
   return new Promise((resolve, reject) => {
     compiler.run((err, stats) => {
 

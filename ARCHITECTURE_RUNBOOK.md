@@ -29,8 +29,8 @@ there is no easy directory split between frontend and backend files. Client-side
 encapsulated together inside the directories.
 
 We must accurately separate these two worlds because they execute under entirely different processes:
--   **The Frontend Reality:** Client-side files go through an aggressive compiler optimisation pass. If a
-    frontend dependency isn't explicitly imported, the compiler completely strips it out (tree-shaking). It physically
+-   **The Frontend Reality:** Client-side files go through compiler optimisation. If a frontend dependency isn't
+    explicitly imported, the compiler completely strips it out (tree-shaking). Code not part of the tree physically
     cannot execute.
 -   **The Backend Reality:** Server-side scripts run natively on the host. They are often triggered dynamically by
     incoming network routes or internal events rather than direct import statements. A backend vulnerability can be
@@ -43,7 +43,7 @@ telemetry through three automated checks:
 -   **Environment-agnostic routing:** By validating files based on what the compilers actually did with them rather than guessing their subsystem context based on folder paths, the pipeline remains completely immune to edge cases caused by mixed full-stack directories.
 -   **Completeness reverse-audit:** To prevent the analysis engine from taking shortcuts or skipping heavy modules to save execution time, the script performs a reverse sweep. It verifies that every single file actively bundled by the compiler has a corresponding record in the engine's payload, terminating the pipeline if any deployed asset was bypassed.
 
-## 📍 Phase 2: Finding Reachable Vulnerabilities
+## 📍 Phase 2: Defining how we look for vulnerabilities
 
-## The Objective
-The safety net identifies all compiled files. 
+## The Reality of Modern Reachability Analysis
+When I got to this phase, I was met with two structural realities of modern reachability analysis:
