@@ -2,32 +2,16 @@ const fs = require('fs');
 const path = require('path');
 
 function safeReadJson(filePath) {
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch (err) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
     console.error(`RESOLVER ERROR: Cannot read ${filePath}`);
     process.exit(1);
   }
 }
 
-// Builds the complete codebase inventory map
-function gatherAllSourceFiles(dirPath, filesArray = []) {
-  if (!fs.existsSync(dirPath)) return filesArray;
-  const items = fs.readdirSync(dirPath);
-
-  items.forEach(item => {
-    const fullPath = path.join(dirPath, item);
-    if (fs.statSync(fullPath).isDirectory()) {
-      gatherAllSourceFiles(fullPath, filesArray);
-    } else {
-      if (/\.(js|jsx|ts|tsx|json)$/.test(fullPath)) {
-        filesArray.push(path.normalize(path.relative(process.cwd(), fullPath)));
-      }
-    }
-  });
-  return filesArray;
-}
-
 function runReachabilityResolver() {
-  console.log("=== Running reachability resolver ===");
+  console.log("=== Running reachability-resolver ===");
 
   const rawVulnerabilitiesPath = 'dependency-vulnerabilities.json';
   if (!fs.existsSync(rawVulnerabilitiesPath)) {
@@ -36,105 +20,109 @@ function runReachabilityResolver() {
   }
 
   const rawFinderOutput = safeReadJson(rawVulnerabilitiesPath);
-  const appSrcDir = path.join('packages', 'evershop', 'src');
+  const findings = rawFinderOutput.findings;
 
-  // Discover every single asset to establish our full baseline contract space
-  const completeCodebaseInventory = gatherAllSourceFiles(appSrcDir);
-
-  // Indexes the finder dictionary map for efficient lookups
+  // Global lookups and dependency inversion tracking
   const finderFindingsMap = new Map();
-  rawFinderOutput.findings.forEach(f => {
-    finderFindingsMap.set(path.normalize(f.filePath), f);
-  });
+  const incomingLinksMap = new Map(); // Key: file being imported, Value: set of files importing it
 
-  const traversalQueue = [];
-  const visitedFiles = new Set();
+  // Using the finder's locallinks to build the graph
+  findings.forEach(node => {
+    const normalisedPath = path.normalize(node.filePath);
+    finderFindingsMap.set(normalisedPath, node);
 
-  // Seed graph traversal queue using public entry points
-  completeCodebaseInventory.forEach(file => {
-    const normalised = path.normalize(file);
-    if (
-      normalised.includes(path.join('src', 'bin')) ||
-      normalised.includes(path.join('pages')) ||
-      normalised.endsWith('bootstrap.ts') ||
-      normalised.endsWith('bootstrap.js')
-    ) {
-      traversalQueue.push(normalised);
-      visitedFiles.add(normalised);
+    if (node.localLinks && Array.isArray(node.localLinks)) {
+      node.localLinks.forEach(linkedFile => {
+        const normalisedLink = path.normalize(linkedFile);
+
+        if (!incomingLinksMap.has(normalisedLink)) {
+          incomingLinksMap.set(normalisedLink, new Set());
+        }
+        // Invert the edge: map the target dependency back to its consumer
+        incomingLinksMap.get(normalisedLink).add(normalisedPath);
+      });
     }
   });
 
-  console.log(`Seeded graph traversal queue with ${traversalQueue.length} vulnerability entry points.\n`);
+  // Defines operational entry criteria
+  function isRuntimeApplicationRoot(normalisedPath) {
+    // Systems bins and boots are always runtime roots
+    if (
+      normalisedPath.includes(path.join('src', 'bin')) ||
+      normalisedPath.endsWith('bootstrap.ts') ||
+      normalisedPath.endsWith('bootstrap.js')
+    ) {
+      return true;
+    }
 
-  const activeThirdPartyPackagesEncountered = new Set();
+    if (normalisedPath.includes(path.join('pages'))) {
+      const parentDir = path.dirname(normalisedPath);
+      return fs.existsSync(path.join(parentDir, 'route.json'));
+    }
 
-  while (traversalQueue.length > 0) {
-    const currentFile = traversalQueue.shift();
-    const finderNode = finderFindingsMap.get(currentFile);
+    return false;
+  }
 
-    if (finderNode) {
-      // If the finder previously flagged this live file as a risk, mark it encountered
-      if (finderNode.status === 'PENDING_EVALUATION' && finderNode.meta && finderNode.meta.package) {
-        activeThirdPartyPackagesEncountered.add(finderNode.meta.package);
+  // Tracks reachability maps per vulnerability signature
+  const verifiedReachablePackages = new Set();
+  const evaluatedVulnerableFiles = findings.filter(f => f.status === 'PENDING_EVALUATION');
+
+  console.log(`Analysing ${evaluatedVulnerableFiles.length} vulnerable target nodes discovered by finder...`);
+
+  // Traces upward for every vulnerable file found
+  evaluatedVulnerableFiles.forEach(vulnerableNode => {
+    const startPath = path.normalize(vulnerableNode.filePath);
+    const targetPackageName = vulnerableNode.meta && vulnerableNode.meta.package;
+
+    const traversalQueue = [startPath];
+    const visitedInThisTrace = new Set([startPath]);
+    let traceIsReachable = false;
+
+    while (traversalQueue.length > 0) {
+      const currentFile = traversalQueue.shift();
+
+      // If this branch touches a valid operational framework asset root, it is live code
+      if (isRuntimeApplicationRoot(currentFile)) {
+        traceIsReachable = true;
+        break;
       }
 
-      // Traversal walks down pre-computed local links supplied by
-      // the dependency vulnerability finder
-      if (finderNode.localLinks && Array.isArray(finderNode.localLinks)) {
-        finderNode.localLinks.forEach(linkedFile => {
-          const normalizedLink = path.normalize(linkedFile);
-          if (!visitedFiles.has(normalizedLink)) {
-            visitedFiles.add(normalizedLink);
-            traversalQueue.push(normalizedLink);
+      // Look up who imports the current file to step backward
+      const upstreamImporters = incomingLinksMap.get(currentFile);
+      if (upstreamImporters) {
+        upstreamImporters.forEach(importer => {
+          if (!visitedInThisTrace.has(importer)) {
+            visitedInThisTrace.add(importer);
+            traversalQueue.push(importer);
           }
         });
       }
     }
-  }
 
-  const finalFindings = [];
-
-  // Map application source files using the pre-compiled lookup dictionary
-  completeCodebaseInventory.forEach(file => {
-    const normalizedFile = path.normalize(file);
-    const finderNode = finderFindingsMap.get(normalizedFile);
-    let structuralStatus = 'SAFE';
-
-    if (visitedFiles.has(normalizedFile)) {
-      if (finderNode) {
-        if (finderNode.status === 'AMBIGUOUS') {
-          structuralStatus = 'AMBIGUOUS';
-        } else if (finderNode.status === 'PENDING_EVALUATION') {
-          structuralStatus = 'REACHABLE';
-        }
-      }
-    } else {
-      structuralStatus = 'MUTED';
+    // If the path reached a verified application asset root, save the package signature
+    if (traceIsReachable && targetPackageName) {
+      verifiedReachablePackages.add(targetPackageName);
     }
-
-    const findingRecord = {
-      filePath: file,
-      status: structuralStatus
-    };
-    if (finderNode && finderNode.meta) {
-      findingRecord.meta = finderNode.meta;
-    }
-    finalFindings.push(findingRecord);
   });
 
-  // Map external third-party entries from our Finder payload
-  rawFinderOutput.findings.forEach(finding => {
-    const normalizedNodePath = path.normalize(finding.filePath);
-    if (completeCodebaseInventory.some(f => path.normalize(f) === normalizedNodePath)) return;
+    // Compiles the result payload
+    const finalFindings = findings.map(node => {
+      let vulnerabilityStatus = node.status;
 
-    const pkgIdentifier = finding.meta && finding.meta.package;
-    const dependencyStatus = activeThirdPartyPackagesEncountered.has(pkgIdentifier) ? 'REACHABLE' : 'MUTED';
+      if (node.status === 'PENDING_EVALUATION') {
+        const pkgIdentifier = node.meta && node.meta.package;
+        // Re-evaluates if this package is actually hit on any valid runtime execution track
+        vulnerabilityStatus = verifiedReachablePackages.has(pkgIdentifier) ? 'REACHABLE' : 'MUTED';
+      }
 
-    finalFindings.push({
-      filePath: finding.filePath,
-      status: dependencyStatus,
-      meta: finding.meta
-    });
+    const findingRecord = {
+      filePath: node.filePath,
+      status: vulnerabilityStatus
+    };
+    if (node.meta) {
+      findingRecord.meta = node.meta;
+    }
+    return findingRecord;
   });
 
   const outputPayload = {
@@ -144,12 +132,13 @@ function runReachabilityResolver() {
 
   fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');
 
+  // Print diagnostics mapping
   const totalEvaluated = finalFindings.length;
   const reachableCount = finalFindings.filter(f => f.status === 'REACHABLE').length;
   const ambiguousCount = finalFindings.filter(f => f.status === 'AMBIGUOUS').length;
   const mutedCount = finalFindings.filter(f => f.status === 'MUTED').length;
 
-  console.log(`📊 Resolution summary`);
+  console.log(`\n📊 Resolution summary`);
   console.log(`Total evaluated: ${totalEvaluated} target records`);
   console.log("---");
   console.log(`🔴 REACHABLE risks: ${reachableCount}`);
