@@ -8,7 +8,7 @@ export default function TelemetryHook() {
 
   return (
     <div className="appsec-pipeline-telemetry" data-trace={dependencyTrace}>
-      <span style={{ display: 'none' }}>AppSec tracker active</span>
+      <span>AppSec test instance injected</span>
     </div>
   );
 }

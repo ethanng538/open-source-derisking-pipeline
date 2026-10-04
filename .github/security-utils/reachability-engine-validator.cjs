@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { getLogicalModuleKey } = require('./path-utils.cjs');
+
 function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -45,10 +47,10 @@ function runResolverValidator() {
   const compiledAssetGraph = new Set([
     ...(webpackGraph.frontend || []),
     ...(webpackGraph.backend || [])
-  ].map(p => path.normalize(p)));
+  ].map(p => getLogicalModuleKey(p)));
 
-  const resolverFiles = new Set();
-  let totalRecordsChecked = 0;
+  const resolverFiles = new Set(resolverOutput.evaluatedModules || []);
+  let totalRecordsChecked = resolverOutput.evaluatedModules ? resolverOutput.evaluatedModules.length : 0;
   let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
   for (const finding of resolverOutput.findings) {
@@ -59,16 +61,16 @@ function runResolverValidator() {
       continue;
     }
 
-    const normalisedPath = path.normalize(finding.filePath);
-    const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
+    const logicalKey = getLogicalModuleKey(finding.filePath);
+    const isAssetCompiled = compiledAssetGraph.has(logicalKey);
 
     // Multi-state breach check
-    if (resolverFiles.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
-      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times with conflicting explicit states.`);
+    if (resolverFiles.has(logicalKey) && finding.status !== 'PENDING_EVALUATION') {
+      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' [${logicalKey}] was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
 
-    if (resolverFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
+    if (resolverFiles.has(logicalKey) && finding.status === 'PENDING_EVALUATION') {
       totalRecordsChecked++;
       continue;
     }
@@ -82,11 +84,11 @@ function runResolverValidator() {
 
     // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Resolver flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Resolver flagged '${finding.filePath}' [${logicalKey}] as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
-    resolverFiles.add(normalisedPath);
+    resolverFiles.add(logicalKey);
     totalRecordsChecked++;
   }
 
@@ -98,7 +100,8 @@ function runResolverValidator() {
     counts.AMBIGUOUS++;
     warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${warningFile}'`);
 
-    resolverFiles.add(normalisedWarnPath);
+    const logicalWarnKey = getLogicalModuleKey(warningFile);
+    resolverFiles.add(logicalWarnKey);
     totalRecordsChecked++;
   }
 
@@ -121,7 +124,8 @@ function runResolverValidator() {
   // Completeness reverse-audit: ensures the reachability resolver didn't bypass any file actively bundled by the compilers.
   if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
     for (const sourceAsset of webpackGraph.appSource) {
-      if (!resolverFiles.has(sourceAsset)) {
+      const logicalSourceKey = getLogicalModuleKey(sourceAsset);
+      if (!resolverFiles.has(logicalSourceKey)) {
         errorLog.push(`COMPLETENESS BREACH: The compiler bundled source module '${sourceAsset}' but the resolver missed evaluating it.`);
         pipelineFailed = true;
       }

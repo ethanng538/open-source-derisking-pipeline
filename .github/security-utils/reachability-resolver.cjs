@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { getLogicalModuleKey } = require('./path-utils.cjs');
+
 function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -95,6 +97,7 @@ function runReachabilityResolver() {
 
   // Compile final clean payload mapping
   const finalFindings = [];
+  const evaluatedKeys = [];
 
   findings.forEach(node => {
     const normalisedPath = path.normalize(node.filePath);
@@ -104,12 +107,15 @@ function runReachabilityResolver() {
       vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
     }
 
+    const formattedLogicalPath = getLogicalModuleKey(node.filePath);
+    evaluatedKeys.push(formattedLogicalPath);
+
     if (vulnerabilityStatus === 'SAFE') {
       return;
     }
 
     const findingRecord = {
-      filePath: node.filePath,
+      filePath: formattedLogicalPath,
       status: vulnerabilityStatus
     };
 
@@ -122,7 +128,8 @@ function runReachabilityResolver() {
 
   const outputPayload = {
     generatedAt: new Date().toISOString(),
-    findings: finalFindings
+    findings: finalFindings,
+    evaluatedModules: evaluatedKeys
   };
 
   fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');

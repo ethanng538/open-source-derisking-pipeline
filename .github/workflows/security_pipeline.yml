@@ -79,7 +79,7 @@ jobs:
       - name: Validate reachability results
         env:
           COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
-        run: node .github/security-rules/reachability-engine-validator.cjs
+        run: node .github/security-utils/reachability-engine-validator.cjs
 
       - name: Archive telemetry artefacts & validator diagnostics
         if: always()

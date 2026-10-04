@@ -14,7 +14,7 @@
 
 
     "build:stats": "npm run build",
-    "validate:pipeline": "node .github/security-rules/reachability-engine-validator.cjs",
+    "validate:pipeline": "node .github/security-utils/reachability-engine-validator.cjs",
 
 
     "setup": "evershop install",
