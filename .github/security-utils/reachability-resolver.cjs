@@ -93,37 +93,31 @@ function runReachabilityResolver() {
     }
   });
 
-  // Files that require interactive triggers and are never bundled at compile time
-  // const staticStructuralExceptions = new Set([
-  //   path.join('packages', 'evershop', 'src', 'modules', 'checkout', 'services', 'cart', 'registerCartBaseFields.js'),
-  //   path.join('packages', 'evershop', 'src', 'modules', 'checkout', 'services', 'cart', 'registerCartItemBaseFields.js'),
-  //   path.join('packages', 'evershop', 'src', 'modules', 'graphql', 'services', 'buildTypes.js'),
-  //   path.join('packages', 'evershop', 'src', 'modules', 'paypal', 'services', 'requester.js')
-  // ]);
-
   // Compile final clean payload mapping
-  const finalFindings = findings.map(node => {
+  const finalFindings = [];
+
+  findings.forEach(node => {
     const normalisedPath = path.normalize(node.filePath);
     let vulnerabilityStatus = node.status;
 
     if (node.status === 'PENDING_EVALUATION') {
-      // if (staticStructuralExceptions.has(normalisedPath)) {
-      //   vulnerabilityStatus = 'MUTED';
-      // } else {
-      //   vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
-      // }
-
       vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
+    }
+
+    if (vulnerabilityStatus === 'SAFE') {
+      return;
     }
 
     const findingRecord = {
       filePath: node.filePath,
       status: vulnerabilityStatus
     };
+
     if (node.meta) {
       findingRecord.meta = node.meta;
     }
-    return findingRecord;
+
+    finalFindings.push(findingRecord);
   });
 
   const outputPayload = {

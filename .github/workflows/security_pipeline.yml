@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  verify-pipeline:
+  reachability-pipeline:
     runs-on: ubuntu-latest
 
     steps:
