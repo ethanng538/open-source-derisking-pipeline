@@ -122,7 +122,7 @@ function runResolverValidator() {
   if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
     for (const sourceAsset of webpackGraph.appSource) {
       if (!resolverFiles.has(sourceAsset)) {
-        errorLog.push(`COMPLETENESS BREACH: The compiler bundled custom source module '${sourceAsset}' but the resolver missed evaluating it.`);
+        errorLog.push(`COMPLETENESS BREACH: The compiler bundled source module '${sourceAsset}' but the resolver missed evaluating it.`);
         pipelineFailed = true;
       }
     }

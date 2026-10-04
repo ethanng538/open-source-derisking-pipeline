@@ -11,6 +11,7 @@ services:
       - /app/packages/evershop/dist
       - /app/packages/evershop/node_modules
       - /app/packages/postgres-query-builder/dist
+      - /app/extensions/appsec-test/dist
     restart: always
     environment:
       DB_HOST: database
