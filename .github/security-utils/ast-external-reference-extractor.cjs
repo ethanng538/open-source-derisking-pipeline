@@ -1,4 +1,6 @@
 const acorn = require('acorn');
+const jsx = require('acorn-jsx');
+const JSXParser = acorn.Parser.extend(jsx());
 const path = require('path');
 
 function cleanQueryAndLoaders(rawString) {
@@ -33,63 +35,78 @@ function extractFileMetadata(filePath, codeText) {
   let isAmbiguous = false;
 
   try {
-    const ast = acorn.parse(codeText, {
+    const ast = JSXParser.parse(codeText, {
       ecmaVersion: 'latest',
       sourceType: 'module',
       allowHashBang: true,
       allowReturnOutsideFunction: true
     });
 
-    function walk(node) {
-      if (!node || isAmbiguous) return;
+      function walk(node) {
+        if (!node || isAmbiguous) return;
 
-      function processStringValue(val) {
-        if (typeof val !== 'string' || !val) return;
-        if (val.startsWith('.')) {
-          const resolved = resolveLocalPath(filePath, val);
-          if (resolved) localLinks.add(resolved);
-        } else {
-          rawPackages.add(cleanQueryAndLoaders(val));
+        function processStringValue(val) {
+          if (typeof val !== 'string' || !val) return;
+          if (val.startsWith('.')) {
+            const resolved = resolveLocalPath(filePath, val);
+            if (resolved) localLinks.add(resolved);
+          } else {
+            rawPackages.add(cleanQueryAndLoaders(val));
+          }
         }
-      }
 
-      if (node.type === 'ImportDeclaration' && node.source) {
-        if (node.source.type === 'Literal') processStringValue(node.source.value);
-        else isAmbiguous = true;
-      }
-
-      if (node.type === 'ImportExpression') {
-        if (node.source && node.source.type === 'Literal') processStringValue(node.source.value);
-        else isAmbiguous = true;
-      }
-
-      if (node.type === 'CallExpression' && node.callee && node.callee.name === 'require') {
-        const args = node.arguments;
-        if (args && args.length > 0) {
-          if (args[0].type === 'Literal') processStringValue(args[0].value);
+        if (node.type === 'ImportDeclaration' && node.source) {
+          if (node.source.type === 'Literal') processStringValue(node.source.value);
           else isAmbiguous = true;
         }
-      }
 
-      if (node.type === 'Literal') processStringValue(node.value);
+        if (node.type === 'ImportExpression') {
+          if (node.source && node.source.type === 'Literal') processStringValue(node.source.value);
+          else isAmbiguous = true;
+        }
 
-      if (node.type === 'TemplateLiteral' && node.quasis) {
-        node.quasis.forEach(q => { if (q.value && q.value.cooked) processStringValue(q.value.cooked); });
-      }
+        if (node.type === 'CallExpression' && node.callee && node.callee.name === 'require') {
+          const args = node.arguments;
+          if (args && args.length > 0) {
+            if (args[0].type === 'Literal') processStringValue(args[0].value);
+            else isAmbiguous = true;
+          }
+        }
 
-      for (const key in node) {
-        if (node[key] && typeof node[key] === 'object') {
-          if (Array.isArray(node[key])) node[key].forEach(walk);
-          else walk(node[key]);
+        if (node.type === 'Literal') processStringValue(node.value);
+
+        if (node.type === 'TemplateLiteral' && node.quasis) {
+          node.quasis.forEach(q => { if (q.value && q.value.cooked) processStringValue(q.value.cooked); });
+        }
+
+        for (const key in node) {
+          if (node[key] && typeof node[key] === 'object') {
+            if (Array.isArray(node[key])) node[key].forEach(walk);
+            else walk(node[key]);
+          }
         }
       }
-    }
 
     walk(ast);
   } catch (err) {
-    isAmbiguous = true;
-  }
+    const importRegex = /(?:import\s+(?:[\w\s{},*]+|(?:\*\s+as\s+\w+))\s+from\s+['"]([^'"]+)['"])|(?:require\s*\(\s*['"]([^'"]+)['"]\s*\))/g;
+    let match;
+    let foundReferences = false;
 
+    while ((match = importRegex.exec(codeText)) !== null) {
+      foundReferences = true;
+      const val = match[1] || match[2];
+
+      if (val.startsWith('.')) {
+        const resolved = resolveLocalPath(filePath, val);
+        if (resolved) localLinks.add(resolved);
+      } else {
+        rawPackages.add(cleanQueryAndLoaders(val));
+      }
+    }
+
+    isAmbiguous = !foundReferences && codeText.includes('import');
+  }
   return {
     isAmbiguous,
     localLinks: Array.from(localLinks),
