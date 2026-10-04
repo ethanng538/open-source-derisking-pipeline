@@ -44,6 +44,9 @@ function runReachabilityResolver() {
 
   // Defines operational application entry criteria
   function isRuntimeApplicationRoot(normalisedPath) {
+    const incomingImports = incomingLinksMap.get(normalisedPath);
+    const totalInboundReferences = incomingImports ? incomingImports.size : 0;
+
     if (
       normalisedPath.includes(path.join('src', 'bin')) ||
       normalisedPath.endsWith('bootstrap.ts') ||
@@ -54,7 +57,9 @@ function runReachabilityResolver() {
 
     if (normalisedPath.includes(path.join('pages'))) {
       const parentDir = path.dirname(normalisedPath);
-      return fs.existsSync(path.join(parentDir, 'route.json'));
+      const hasRouteJson = fs.existsSync(path.join(parentDir, 'route.json'));
+
+      return hasRouteJson && totalInboundReferences > 0;
     }
 
     return false;
