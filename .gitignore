@@ -3,7 +3,6 @@ node_modules
 dist
 !packages/create-evershop-app/sample/extensions/sample/dist
 !packages/create-evershop-app/sample/themes/sample/dist
-/extensions/*
 !extensions/agegate
 !extensions/azure_file_storage
 !extensions/google_login
@@ -35,7 +34,6 @@ playwright/.cache
 .prettierrc
 mysqlToPostgres.js
 /docs
-extensions
 /specifications
 /wiki
 /design-kit

@@ -8,8 +8,6 @@ import { Button } from '@components/common/ui/Button.js';
 import { _ } from '@evershop/evershop/lib/locale/translate/_';
 import { LockKeyhole, Mail } from 'lucide-react';
 
-import { OpenUrlApi } from '@a2ui/web_core';
-
 interface LoginFormProps {
   authUrl: string;
   dashboardUrl: string;
@@ -19,12 +17,6 @@ const SubmitButton: React.FC = () => {
   const {
     formState: { isSubmitting }
   } = useFormContext();
-
-  const test = typeof OpenUrlApi;
-  if (!test) {
-    throw new Error();
-  }
-
   return (
     <div className="form-submit-button flex border-t border-border mt-4 pt-4 justify-between">
       <Button
