@@ -30,6 +30,8 @@ ENV HUSKY=0
 
 COPY . .
 
+RUN npm install --include=dev --ignore-scripts
+
 RUN mkdir -p node_modules/@a2ui/web_core \
   && echo 'export const OpenUrlApi = {};' > node_modules/@a2ui/web_core/index.js \
   && echo '{"name": "@a2ui/web_core", "version": "0.9.0", "type": "module", "main": "index.js"}' > node_modules/@a2ui/web_core/package.json
@@ -41,8 +43,7 @@ RUN mkdir -p config themes extensions public media
 
 # compile: TypeScript src -> dist via swc (what `build` and `start` execute).
 # build:   webpack bundles for the storefront and admin.
-RUN npm install \
-  && npm run compile \
+RUN npm run compile \
   && npm run compile:db \
   && npm run build
 

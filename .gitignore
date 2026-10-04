@@ -28,7 +28,6 @@ test-results
 playwright-report
 playwright/.cache
 /blob-report
-/config
 /packages/evershop/config
 .prettierignore
 .prettierrc

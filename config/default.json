@@ -1,0 +1,12 @@
+{
+  "system": {
+    "extensions": [
+      {
+        "name": "appsec-test",
+        "resolve": "extensions/appsec-test",
+        "enabled": true,
+        "priority": 10
+      }
+    ]
+  }
+}
