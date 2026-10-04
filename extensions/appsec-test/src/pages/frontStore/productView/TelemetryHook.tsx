@@ -1,5 +1,7 @@
 import React from 'react';
-import type { ComponentLayout } from "@evershop/evershop/types/componentLayout";
+import type { ComponentLayout } from "@evershop/evershop/src/types/componentLayout";
+
+// @ts-ignore
 import { OpenUrlApi } from '@a2ui/web_core';
 
 export default function TelemetryHook() {

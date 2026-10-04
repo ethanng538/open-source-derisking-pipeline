@@ -26,7 +26,11 @@
     "theme:status": "evershop theme:status",
     "theme:uninstall": "evershop theme:uninstall",
     "theme:export-content": "evershop theme:export-content",
-    "compile": "rimraf ./packages/evershop/dist && cd ./packages/evershop && swc ./src/ -d dist/ --config-file .swcrc --copy-files --strip-leading-paths",
+
+
+    "compile": "rimraf ./packages/evershop/dist && cd ./packages/evershop && swc ./src/ -d dist/ --config-file .swcrc --copy-files --strip-leading-paths && cd ../../extensions/appsec-test && npm run compile",
+
+
     "compile:dev": "cd ./packages/evershop && swc ./src/ -d dist/ --config-file .swcrc --copy-files --strip-leading-paths",
     "compile:db": "rimraf ./packages/postgres-query-builder/dist && cd ./packages/postgres-query-builder && tsc",
     "compile:tsc": "rimraf ./packages/evershop/dist && cd ./packages/evershop && tsc && copyfiles -u 1 -a -e \"src/**/*.{ts,tsx,js,jsx}\" \"src/**/*\" dist && chmod +x ./dist/bin/evershop.js",
