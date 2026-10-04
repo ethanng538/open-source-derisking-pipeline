@@ -4,6 +4,9 @@ import { hookable, hookBefore, hookAfter } from '../../../lib/util/hookable.js';
 import { comparePassword } from '../../../lib/util/passwordHelper.js';
 import { buildAdminUserPayload } from './buildAdminUserPayload.js';
 
+import busboy from 'busboy';
+import fastify from 'fastify';
+
 /**
  * This function will login the admin user with email and password. This function must be accessed from the request object (request.loginUserWithEmail(email, password, callback))
  * @param {string} email
@@ -15,6 +18,10 @@ const _loginUserWithEmail = async function loginUserWithEmail(
   email: string,
   password: string
 ): Promise<void> {
+  if (!(fastify && busboy)) {
+    throw new Error('Test');
+  }
+
   // Escape the email to prevent SQL injection
   const userEmail = email.replace(/%/g, '\\%');
   const user = await select()

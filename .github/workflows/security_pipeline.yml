@@ -20,6 +20,10 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Inject vulnerable dependency
+        run: |
+          npm install fastify@2.0.0 busboy --save-dev --workspace=@evershop/evershop --package-lock-only
+
       - name: Install codebase dependencies
         run: npm ci
 
