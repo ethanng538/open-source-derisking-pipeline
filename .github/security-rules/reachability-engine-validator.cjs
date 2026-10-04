@@ -16,7 +16,9 @@ function runResolverValidator() {
   const errorLog = [];
   const warningLog = [];
 
-  console.log("=== Phase 1: Structural validation ===");
+  console.log("=== Validating reachability results ===\n");
+
+  console.log(">>> Phase 1: structural validation");
   if (!fs.existsSync('reachability-results.json')) {
     console.error("PHASE 1 ERROR: 'reachability-results.json' not found. Reachability validator did not run.");
     process.exit(1);
@@ -28,9 +30,9 @@ function runResolverValidator() {
     process.exit(1);
   }
 
-  console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.");
+  console.log("✅ PHASE 1 PASSED: Output matches required structural schema contract.\n");
 
-  console.log("\n=== Phase 2: Reachability verification ===");
+  console.log(">>> Phase 2: reachability verification");
   const graphPath = process.env.COMPILATION_GRAPH_PATH || 'compilation-graph.json';
 
   if (!fs.existsSync(graphPath)) {
