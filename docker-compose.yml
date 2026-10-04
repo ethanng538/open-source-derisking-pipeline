@@ -2,7 +2,12 @@ version: '3.8'
 
 services:
   app:
-    image: evershop/evershop:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - /app/node_modules
     restart: always
     environment:
       DB_HOST: database

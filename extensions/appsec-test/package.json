@@ -1,0 +1,11 @@
+{
+  "name": "@evershop/appsec-test",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "compile": "tsc && copyfiles -u 1 \"src/**/*.{graphql,scss,json}\" dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

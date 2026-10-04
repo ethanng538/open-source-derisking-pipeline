@@ -13,6 +13,6 @@ export default function TelemetryHook() {
 }
 
 export const layout: { areaId: string; sortOrder: number } = {
-  areaId: "productPageMiddleLeft",
+  areaId: "content",
   sortOrder: 99
 };
