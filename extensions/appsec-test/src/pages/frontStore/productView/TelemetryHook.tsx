@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ComponentLayout } from "@evershop/evershop/src/types/componentLayout";
+import type { ComponentLayout } from '../../../../../../packages/evershop/src/types/componentLayout.ts';
 
 // @ts-ignore
 import { OpenUrlApi } from '@a2ui/web_core';
