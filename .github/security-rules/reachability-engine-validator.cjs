@@ -82,7 +82,7 @@ function runResolverValidator() {
 
     // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Engine flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Resolver flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
@@ -111,14 +111,14 @@ function runResolverValidator() {
 
   if (totalRecordsChecked === 0) {
     if (totalAuditVulnerabilities > 0) {
-      errorLog.push(`ZERO RECORD BREACH: The engine evaluated 0 files but 'npm-audit.json' contains ${totalAuditVulnerabilities} active vulnerabilities.`);
+      errorLog.push(`ZERO RECORD BREACH: The resolver evaluated 0 files but 'npm-audit.json' contains ${totalAuditVulnerabilities} active vulnerabilities.`);
       pipelineFailed = true;
     } else {
       console.log(" Zero records found because the project package manifest has 0 vulnerabilities.");
     }
   }
 
-  // Completeness reverse-audit: ensures the analysis engine didn't bypass any file actively bundled by the compilers.
+  // Completeness reverse-audit: ensures the reachability resolver didn't bypass any file actively bundled by the compilers.
   if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
     for (const sourceAsset of webpackGraph.appSource) {
       if (!resolverFiles.has(sourceAsset)) {
@@ -130,7 +130,7 @@ function runResolverValidator() {
 
   // Evaluate statistical distribution
   if (totalRecordsChecked > 0 && counts.REACHABLE === 0 && counts.MUTED === 0 && counts.SAFE === 0) {
-    errorLog.push(`TRIVIAL PAYLOAD BREACH: Engine failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}, SAFE: ${counts.SAFE}.`);
+    errorLog.push(`TRIVIAL PAYLOAD BREACH: Resolver failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}, SAFE: ${counts.SAFE}.`);
     pipelineFailed = true;
   }
 
@@ -151,7 +151,7 @@ function runResolverValidator() {
     errors: errorLog,
     warnings: warningLog,
     webpackGraphSize: compiledAssetGraph.size,
-    engineFilesSize: resolverFiles.size
+    resolverFilesSize: resolverFiles.size
   };
 
   fs.writeFileSync(
