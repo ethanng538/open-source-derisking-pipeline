@@ -47,7 +47,7 @@ function runResolverValidator() {
 
   const resolverFiles = new Set();
   let totalRecordsChecked = 0;
-  let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, WARNING: 0 };
+  let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
   for (const finding of resolverOutput.findings) {
     if (!finding.filePath || !finding.status) {
@@ -88,12 +88,12 @@ function runResolverValidator() {
     totalRecordsChecked++;
   }
 
-  const filesWithAmbiguousDependencies = webpackGraph.dynamicExpressionOrigins || [];
+  const filesWithAmbiguousDependencies = webpackGraph.unresolvedDynamicImports || [];
 
   for (const warningFile of filesWithAmbiguousDependencies) {
     const normalisedWarnPath = path.normalize(warningFile);
 
-    counts.WARNING++;
+    counts.AMBIGUOUS++;
     warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${warningFile}'`);
 
     resolverFiles.add(normalisedWarnPath);
@@ -171,8 +171,8 @@ function runResolverValidator() {
   console.log(`📊 Validation summary`);
   console.log(`Total evaluated: ${totalRecordsChecked} target files`);
   console.log("---");
-  console.log(`🟢 MUTED risks: ${counts.MUTED} (pruned or non-compiled code)`);
-  console.log(`⚠️ WARNINGS: ${counts.WARNING} (dynamic imports needing human audit)`);
+  console.log(`⚪ MUTED risks: ${counts.MUTED} (pruned or non-compiled code)`);
+  console.log(`⚠️ WARNINGS: ${counts.AMBIGUOUS} (dynamic imports needing human audit)`);
 
   if (counts.REACHABLE > 0) {
     console.log(`🔴 REACHABLE risks:  ${counts.REACHABLE} (vulnerabilities built into binary)`);

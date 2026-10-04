@@ -8,19 +8,6 @@ function safeReadJson(filePath) {
   }
 }
 
-const fileContentCache = new Map();
-function getCachedFileContent(filePath) {
-  if (fileContentCache.has(filePath)) return fileContentCache.get(filePath);
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    fileContentCache.set(filePath, content);
-    return content;
-  } catch (e) {
-    fileContentCache.set(filePath, '');
-    return '';
-  }
-}
-
 // Builds the complete codebase inventory map
 function gatherAllSourceFiles(dirPath, filesArray = []) {
   if (!fs.existsSync(dirPath)) return filesArray;
@@ -31,7 +18,7 @@ function gatherAllSourceFiles(dirPath, filesArray = []) {
     if (fs.statSync(fullPath).isDirectory()) {
       gatherAllSourceFiles(fullPath, filesArray);
     } else {
-      if (/\.(js|jsx|ts|tsx|json)\$/.test(fullPath)) {
+      if (/\.(js|jsx|ts|tsx|json)$/.test(fullPath)) {
         filesArray.push(path.normalize(path.relative(process.cwd(), fullPath)));
       }
     }
@@ -39,35 +26,10 @@ function gatherAllSourceFiles(dirPath, filesArray = []) {
   return filesArray;
 }
 
-function extractLocalImports(filePath, fileContent) {
-  const imports = [];
-  // Common import patterns
-  const relativeImportRegex = /(?:require\s*\(\s*['"](\..*?)['"]\s*\)|from\s+['"](\..*?)['"]|import\s+['"](\..*?)['"])/g;
-
-  let match;
-  const currentDir = path.dirname(filePath);
-
-  while ((match = relativeImportRegex.exec(fileContent)) !== null) {
-    const relativeTarget = match[1] || match[2] || match[3];
-    if (!relativeTarget) continue;
-
-    let absoluteTarget = path.resolve(currentDir, relativeTarget);
-    const extensionsToTry = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.js'];
-    for (const ext of extensionsToTry) {
-      const pathWithExt = absoluteTarget + ext;
-      if (fs.existsSync(pathWithExt) && fs.statSync(pathWithExt).isFile()) {
-        imports.push(path.normalize(path.relative(process.cwd(), pathWithExt)));
-        break;
-      }
-    }
-  }
-  return imports;
-}
-
 function runReachabilityResolver() {
   console.log("=== Running reachability resolver ===");
 
-  const rawVulnerabilitiesPath = 'vulnerable-dependencies.json';
+  const rawVulnerabilitiesPath = 'dependency-vulnerabilities.json';
   if (!fs.existsSync(rawVulnerabilitiesPath)) {
     console.error(`RESOLVER ERROR: Missing input file (${rawVulnerabilitiesPath})`);
     process.exit(1);
@@ -79,14 +41,16 @@ function runReachabilityResolver() {
   // Discover every single asset to establish our full baseline contract space
   const completeCodebaseInventory = gatherAllSourceFiles(appSrcDir);
 
-  const activePackageTargets = new Set();
+  // Indexes the finder dictionary map for efficient lookups
+  const finderFindingsMap = new Map();
   rawFinderOutput.findings.forEach(f => {
-    if (f.meta && f.meta.package) activePackageTargets.add(f.meta.package);
+    finderFindingsMap.set(path.normalize(f.filePath), f);
   });
 
   const traversalQueue = [];
   const visitedFiles = new Set();
 
+  // Seed graph traversal queue using public entry points
   completeCodebaseInventory.forEach(file => {
     const normalised = path.normalize(file);
     if (
@@ -100,63 +64,65 @@ function runReachabilityResolver() {
     }
   });
 
-  console.log(`Seeded graph traversal queue with ${traversalQueue.length} vulnerability entry points.`);
+  console.log(`Seeded graph traversal queue with ${traversalQueue.length} vulnerability entry points.\n`);
 
   const activeThirdPartyPackagesEncountered = new Set();
-  const sourceFileStatusMap = new Map(); // Tracks dynamic findings
 
   while (traversalQueue.length > 0) {
     const currentFile = traversalQueue.shift();
-    const content = getCachedFileContent(currentFile);
-    let currentFileStatus = 'SAFE';
+    const finderNode = finderFindingsMap.get(currentFile);
 
-    if (/require\s*\([^'"]*?[\+\$`]/g.test(content) || /import\s*\([^'"]*?[\+\$`]/g.test(content)) {
-      currentFileStatus = 'WARNING';
-    }
+    if (finderNode) {
+      // If the finder previously flagged this live file as a risk, mark it encountered
+      if (finderNode.status === 'PENDING_EVALUATION' && finderNode.meta && finderNode.meta.package) {
+        activeThirdPartyPackagesEncountered.add(finderNode.meta.package);
+      }
 
-    // Evaluate direct third-party vulnerability imports
-    for (const pkgName of activePackageTargets) {
-      const importRegex = new RegExp(`(require\\(['"]${pkgName}['"]\\)|from\\s+['"]${pkgName}['"]|import\\s+['"]${pkgName}['"])`, 'g');
-      if (importRegex.test(content)) {
-        currentFileStatus = 'REACHABLE';
-        activeThirdPartyPackagesEncountered.add(pkgName);
+      // Traversal walks down pre-computed local links supplied by
+      // the dependency vulnerability finder
+      if (finderNode.localLinks && Array.isArray(finderNode.localLinks)) {
+        finderNode.localLinks.forEach(linkedFile => {
+          const normalizedLink = path.normalize(linkedFile);
+          if (!visitedFiles.has(normalizedLink)) {
+            visitedFiles.add(normalizedLink);
+            traversalQueue.push(normalizedLink);
+          }
+        });
       }
     }
-
-    sourceFileStatusMap.set(currentFile, currentFileStatus);
-
-    // Extract next structural branches and append unvisited local files onto the queue
-    const localLinks = extractLocalImports(currentFile, content);
-    localLinks.forEach(linkedFile => {
-      if (!visitedFiles.has(linkedFile)) {
-        visitedFiles.add(linkedFile);
-        traversalQueue.push(linkedFile);
-      }
-    });
   }
 
   const finalFindings = [];
 
-  // Map application source files
+  // Map application source files using the pre-compiled lookup dictionary
   completeCodebaseInventory.forEach(file => {
     const normalizedFile = path.normalize(file);
+    const finderNode = finderFindingsMap.get(normalizedFile);
     let structuralStatus = 'SAFE';
 
     if (visitedFiles.has(normalizedFile)) {
-      structuralStatus = sourceFileStatusMap.get(normalizedFile) || 'SAFE';
+      if (finderNode) {
+        if (finderNode.status === 'AMBIGUOUS') {
+          structuralStatus = 'AMBIGUOUS';
+        } else if (finderNode.status === 'PENDING_EVALUATION') {
+          structuralStatus = 'REACHABLE';
+        }
+      }
     } else {
-      // Unvisited code contains a vulnerability signature from the finder? It's proven to be dead MUTED code.
-      const listedInFinder = rawFinderOutput.findings.some(f => path.normalize(f.filePath) === normalizedFile);
-      structuralStatus = listedInFinder ? 'MUTED' : 'SAFE';
+      structuralStatus = 'MUTED';
     }
 
-    finalFindings.push({
+    const findingRecord = {
       filePath: file,
       status: structuralStatus
-    });
+    };
+    if (finderNode && finderNode.meta) {
+      findingRecord.meta = finderNode.meta;
+    }
+    finalFindings.push(findingRecord);
   });
 
-  // Map third-party node_modules entry points from our finder payload
+  // Map external third-party entries from our Finder payload
   rawFinderOutput.findings.forEach(finding => {
     const normalizedNodePath = path.normalize(finding.filePath);
     if (completeCodebaseInventory.some(f => path.normalize(f) === normalizedNodePath)) return;
@@ -180,11 +146,15 @@ function runReachabilityResolver() {
 
   const totalEvaluated = finalFindings.length;
   const reachableCount = finalFindings.filter(f => f.status === 'REACHABLE').length;
+  const ambiguousCount = finalFindings.filter(f => f.status === 'AMBIGUOUS').length;
+  const mutedCount = finalFindings.filter(f => f.status === 'MUTED').length;
 
   console.log(`📊 Resolution summary`);
   console.log(`Total evaluated: ${totalEvaluated} target records`);
   console.log("---");
   console.log(`🔴 REACHABLE risks: ${reachableCount}`);
+  console.log(`🟡 WARNINGS: ${ambiguousCount}`);
+  console.log(`⚪ MUTED risks: ${mutedCount}`);
 }
 
 runReachabilityResolver();

@@ -8,8 +8,6 @@ import { isDist } from './isDist.js';
 import { isSrc } from './isSrc.js';
 import { restartProcess } from './processors/restart.js';
 
-import { busboy } from '@fastify/busboy';
-
 export type Event = {
   path: PathLike;
   type: 'create' | 'update' | 'delete';

@@ -1,27 +1,35 @@
 # 📓 Architecture Runbook: Verifiable AppSec
 
 This document serves as the chronological engineering ledger for this project. It details my validation-first approach
-to designing this security pipeline, key design considerations and how I implemented my solution.
+to designing my security pipeline, key design considerations and core implementation details.
 
 ---
 
 ## 📍 Phase 1: Thinking About the Result
 
 ### The Objective
-An analysis engine cannot safely grade its own homework. Moreover, EverShop uses a unique architecture that orchestrates
-its own compilation loops behind the scenes, increasing the likelihood of data mapping errors in any implementation.
-
-In addition, ambiguous code patterns (like dynamic strings inside a `require()` call) makes reachability analysis
-non-deterministic. The reachability resolver would need to route such instances into a `WARNING` state to protect
-the integrity of the pass/fail gates while isolating edge cases for explicit human review.
+An analysis engine cannot safely grade its own homework, meaning there must exist a separate process that evaluates the
+accuracy of any reachability results. Moreover, EverShop uses a unique architecture that orchestrates its own
+compilation loops behind the scenes, increasing the likelihood of data mapping errors in any implementation.
 
 ### The Invariant Matrix
+When considering the output of a reachability analysis in the context of third-party dependencies, a file would receive
+one of the following states:
+-   `REACHABLE`: The file references an external module that introduces an accessible and exploitable
+    vulnerability.
+-   `MUTED`: The file references an external module that contains a vulnerability but the flaw cannot be accessed or
+    exploited.
+-   `AMBIGUOUS:` The file references an external module whose source is ambiguous.
+-   `SAFE`: The file does not reference external modules with active CVEs.
+
 To address the risks associated with EverShop's architecture as well as ensuring any implementation is producing
 accurate results, I designed a safety net that is built on the following principles:
 
--   **Inclusion (reachable):** If a file is flagged as live risk, it must actively exist in the compiled asset graph.
--   **Completeness (anti-bypass):** Every source file bundled by the compiler must have an explicit evaluation state.
+-   **Inclusion:** If a file is flagged as `REACHABLE`, it must be a file that was compiled.
+-   **Completeness:** Every source file bundled by the compiler must have an explicit evaluation state.
     The engine cannot silently ignore compiled files.
+-   **Causality:** If it is known the project uses a third-party dependency that contains a vulnerability, there
+    must be non-zero `REACHABLE` or `MUTED` records flagged by the engine.
 
 ### Architectural Execution
 Given EverShop's ["Modular Monolith" architecture](https://evershop.io/docs/development/knowledge-base/architecture-overview "EverShop Architecture Overview"),
@@ -38,11 +46,19 @@ We must accurately handle these two worlds because they execute under entirely d
 
 To address these considerations, telemetry hooks were non-intrusively placed within EverShop's compilation loops, using
 the compiler's own metadata to explicitly map web and node infrastructure:
--   **Definitive scoping:** Using compiler telemetry, a definitive search space for reachable
-    vulnerabilities can be defined.
+-   **Search space definition:** Using compiler telemetry, it can be definitively determined whether a file was
+    compiled.
 -   **Environment-agnostic routing:** By validating files based on what the compilers actually did with them, the
     validator gracefully handles mixed, full-stack directories.
 
-## 📍 Phase 2: Resolving Reachable Vulnerabilities
+## 📍 Phase 2: Finding Potential Vulnerabilities
+
+### Leveraging AST analysis
+AST tools deterministically know the meanings of code statements.
+
+### Producing the Initial Search Space
 
 
+## 📍 Phase 3: Evaluating for Reachability
+
+## Product Retrospective

@@ -6,7 +6,9 @@
 > flows across a production codebase, explicitly separating active runtime exposure from dead code.
 
 ## 🔬 The Scope
-To maintain technical accuracy, this project is intentionally constrained to third-party dependency vulnerabilities.
+To clearly defining what execution flows I am analysing, this project is intentionally constrained to
+third-party dependency vulnerabilities. Focusing on public dependencies grounds the search space to known CVE data,
+enabling the project to focus on reachability while allowing the system to validate its logic against actual risk.
 
 ### What This Pipeline Measures
 This project focuses on a practical, real-world distinction: the difference between code sitting on disk and code that
@@ -23,25 +25,32 @@ safely eliminated as dead weight or if it successfully made its way into the fin
 ------------------------------
 
 ## 🛠️ System & Pipeline Architecture
-My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) repository to provide a real-world
-baseline for my pipeline.
+My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) repository to provide a real-world baseline for my pipeline. Using a modern tech
+stack and an API that unifies both admin and storefront operations, it acts as a realistic benchmark to evaluate my
+project outcomes.
 
+The structure of my pipeline is as follows:
 ```text
 [ 1. EXTRACT MANIFEST VULNERABILITIES ]
 A list of vulnerable packages are extracted from the project's third-party dependencies.
               │
               ▼
-[ 2. MAP TO APPLICATION CODE ]
-Files that use flagged packages are identified. Dynamic references are marked as ambiguous.
+[ 2. EXTRACT FILE DEPENDENCIES ]
+Abstract Syntax Tree (AST) analysis is used to collate all external references used in
+application code.
+              │
+              ▼        
+[ 3. MAPPING TO VULNERABLE DEPENDENCIES ]
+The external references found are mapped to the list of vulnerable packages.
               │
               ▼
-[ 3. ANALYSE FOR REACHABILITY ]
-Application code is checked for exposure.
+[ 4. REACHABILITY RESOLUTION ]
+The dependency vulnerability mappings are analysed for reachability.
               │
               ▼
-[ 4. SAFETY NET ENFORCEMENT ]
-Run strict compliance audits to verify the system's calculations,
-blocking the build if data contradictions or unverified assets are found.
+[ 5. SAFETY NET ENFORCEMENT ]
+Strict compliance gates are used to verify the system's output,
+blocking the build if data contradictions or insufficient coverage is found.
 ```
 
 👉 **To inspect the custom validation scripts, read the real execution telemetry records or review the step-by-step
