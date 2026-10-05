@@ -132,7 +132,6 @@ export async function compile(routes) {
     backend: Array.from(new Set(serverResult.compiledModules)),
     appSource: Array.from(allBundledPaths).filter(p =>
       p.includes(path.join('packages', 'evershop', 'src')) ||
-      p.includes(path.join('packages', 'evershop', 'dist')) ||
       p.includes(path.join('extensions'))
     ),
     unresolvedDynamicImports: Array.from(new Set([

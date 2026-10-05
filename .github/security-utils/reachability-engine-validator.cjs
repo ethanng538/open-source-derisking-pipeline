@@ -47,8 +47,8 @@ function runResolverValidator() {
     ...(webpackGraph.backend || [])
   ].map(p => path.normalize(p)));
 
-  const resolverFiles = new Set(resolverOutput.evaluatedModules || []);
-  let totalRecordsChecked = resolverOutput.evaluatedModules ? resolverOutput.evaluatedModules.length : 0;
+  const resolverFiles = new Set(resolverOutput.records || []);
+  let totalRecordsChecked = resolverOutput.records ? resolverOutput.records.length : 0;
   let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
   for (const finding of resolverOutput.findings) {
@@ -95,7 +95,7 @@ function runResolverValidator() {
     const normalisedWarnPath = path.normalize(warningFile);
 
     counts.AMBIGUOUS++;
-    warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${warningFile}'`);
+    warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${normalisedWarnPath}'`);
 
     resolverFiles.add(warningFile);
     totalRecordsChecked++;

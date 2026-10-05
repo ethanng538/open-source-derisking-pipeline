@@ -13,20 +13,20 @@ function safeReadJson(filePath) {
 function runReachabilityResolver() {
   console.log("=== Running reachability-resolver ===");
 
-  const rawVulnerabilitiesPath = 'dependency-vulnerabilities.json';
-  if (!fs.existsSync(rawVulnerabilitiesPath)) {
-    console.error(`RESOLVER ERROR: Missing input file (${rawVulnerabilitiesPath})`);
+  const potentialVulnerabilitiesPath = 'dependency-vulnerabilities.json';
+  if (!fs.existsSync(potentialVulnerabilitiesPath)) {
+    console.error(`RESOLVER ERROR: Missing input file (${potentialVulnerabilitiesPath})`);
     process.exit(1);
   }
 
-  const rawFinderOutput = safeReadJson(rawVulnerabilitiesPath);
-  const findings = rawFinderOutput.findings;
+  const dependencyVulnerabilityFinderOutput = safeReadJson(potentialVulnerabilitiesPath);
+  const potentialVulnerabilities = dependencyVulnerabilityFinderOutput.findings;
 
   const finderFindingsMap = new Map();
   const incomingLinksMap = new Map(); // Key: file being imported, Value: set of files importing it
 
   // Builds the graph utilising the finder's pre-computed localLinks
-  findings.forEach(node => {
+  potentialVulnerabilities.forEach(node => {
     const normalisedPath = path.normalize(node.filePath);
     finderFindingsMap.set(normalisedPath, node);
 
@@ -58,7 +58,7 @@ function runReachabilityResolver() {
   }
 
   const verifiedReachableFiles = new Set();
-  const evaluatedVulnerableFiles = findings.filter(f => f.status === 'PENDING_EVALUATION');
+  const evaluatedVulnerableFiles = potentialVulnerabilities.filter(f => f.status === 'PENDING_EVALUATION');
 
   console.log(`Analysing ${evaluatedVulnerableFiles.length} vulnerable target nodes discovered by finder...`);
 
@@ -94,10 +94,10 @@ function runReachabilityResolver() {
   });
 
   // Compile final clean payload mapping
-  const finalFindings = [];
-  const evaluatedKeys = [];
+  const findings = [];
+  const resolverRecords = [];
 
-  findings.forEach(node => {
+  potentialVulnerabilities.forEach(node => {
     const normalisedPath = path.normalize(node.filePath);
     let vulnerabilityStatus = node.status;
 
@@ -105,7 +105,7 @@ function runReachabilityResolver() {
       vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
     }
 
-    evaluatedKeys.push(node.filePath);
+    resolverRecords.push(node.filePath);
 
     if (vulnerabilityStatus === 'SAFE') {
       return;
@@ -120,21 +120,34 @@ function runReachabilityResolver() {
       findingRecord.meta = node.meta;
     }
 
-    finalFindings.push(findingRecord);
+    findings.push(findingRecord);
   });
 
+  const timestamp = new Date().toISOString();
+
   const outputPayload = {
-    generatedAt: new Date().toISOString(),
-    findings: finalFindings,
-    evaluatedModules: evaluatedKeys
+    generatedAt: timestamp,
+    findings: findings,
+    records: resolverRecords
   };
 
   fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');
 
-  const totalEvaluated = finalFindings.length;
-  const reachableCount = finalFindings.filter(f => f.status === 'REACHABLE').length;
-  const ambiguousCount = finalFindings.filter(f => f.status === 'AMBIGUOUS').length;
-  const mutedCount = finalFindings.filter(f => f.status === 'MUTED').length;
+  const telemetryOutputPayload = {
+    generatedAt: timestamp,
+    summary: {
+      totalInputRecords: potentialVulnerabilities.length,
+      findingsLogged: findings.length
+    },
+    records: resolverRecords
+  };
+
+  fs.writeFileSync('resolver-evaluation-record.json', JSON.stringify(telemetryOutputPayload, null, 2), 'utf8');
+
+  const totalEvaluated = findings.length;
+  const reachableCount = findings.filter(f => f.status === 'REACHABLE').length;
+  const ambiguousCount = findings.filter(f => f.status === 'AMBIGUOUS').length;
+  const mutedCount = findings.filter(f => f.status === 'MUTED').length;
 
   console.log(`\n📊 Resolution summary`);
   console.log(`Total evaluated: ${totalEvaluated} target records`);
