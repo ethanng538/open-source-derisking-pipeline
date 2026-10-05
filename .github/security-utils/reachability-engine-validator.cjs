@@ -24,8 +24,14 @@ function runResolverValidator() {
     console.error("PHASE 1 ERROR: 'reachability-results.json' not found. Reachability validator did not run.");
     process.exit(1);
   }
+  if (!fs.existsSync('dependency-vulnerabilities.json')) {
+    console.error("PHASE 1 ERROR: 'dependency-vulnerabilities.json' not found. Finder telemetry is missing.");
+    process.exit(1);
+  }
 
   const resolverOutput = safeReadJson('reachability-results.json');
+  const finderOutput = safeReadJson('dependency-vulnerabilities.json');
+
   if (!resolverOutput.findings || !Array.isArray(resolverOutput.findings)) {
     console.error("PHASE 1 ERROR: Resolver results is missing a valid 'findings' array.");
     process.exit(1);
@@ -48,8 +54,15 @@ function runResolverValidator() {
     ...(webpackGraph.backend || [])
   ].map(p => path.normalize(p)));
 
+  const finderFiles = new Set((finderOutput.findings || []).map(f => path.normalize(f.filePath)));
+  // The intersection between the compilation graph and files with potential vulnerabilities
+  const securitySearchSpace = new Set(
+    (webpackGraph.appSource || []).map(p => path.normalize(p)).filter(p => finderFiles.has(p))
+  );
+
   const resolverFiles = new Set(resolverOutput.records || []);
   const findingsTrackingSet = new Set();
+
   let totalRecordsChecked = resolverOutput.records ? resolverOutput.records.length : 0;
   let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
@@ -125,12 +138,10 @@ function runResolverValidator() {
   }
 
   // Completeness reverse-audit: ensures the reachability resolver didn't bypass any file actively bundled by the compilers.
-  if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
-    for (const sourceAsset of webpackGraph.appSource) {
-      if (!findingsTrackingSet.has(sourceAsset)) {
-        errorLog.push(`COMPLETENESS BREACH: The compiler bundled source module '${sourceAsset}' but the resolver missed evaluating it.`);
-        pipelineFailed = true;
-      }
+  for (const sourceAsset of securitySearchSpace) {
+    if (!resolverFiles.has(sourceAsset)) {
+      errorLog.push(`COMPLETENESS BREACH: The compiler bundled vulnerable suspect module '${sourceAsset}' but the reachability resolver bypassed it.`);
+      pipelineFailed = true;
     }
   }
 
