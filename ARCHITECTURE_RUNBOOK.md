@@ -26,8 +26,8 @@ To address the risks associated with EverShop's architecture as well as ensuring
 accurate results, I designed a safety net that is built on the following principles:
 
 -   **Inclusion:** If a file is flagged as `REACHABLE`, it must be a file that was compiled.
--   **Completeness:** Every source file bundled by the compiler must have an explicit evaluation state.
-    The engine cannot silently ignore compiled files.
+-   **Completeness:** Every source file flagged as potentially containing a vulnerability and bundled by the compiler
+    must have an explicit evaluation state.
 -   **Causality:** If it is known the project uses a third-party dependency that contains a vulnerability, there
     must be non-zero `REACHABLE` or `MUTED` records flagged by the engine.
 
@@ -60,5 +60,12 @@ AST tools deterministically know the meanings of code statements.
 
 
 ## 📍 Phase 3: Evaluating for Reachability
+
+import-and-invocation chain
+
+- Checks if imports are actually used
+- Checks if the components or functions that use the vulnerable imports have actual usage
+- Actual usage means the file itself will be structurally included by EverShop or if another file that will be included
+  references the file using the vulnerability
 
 ## Product Retrospective
