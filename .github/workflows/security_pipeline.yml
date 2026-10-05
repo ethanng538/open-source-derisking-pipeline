@@ -91,4 +91,5 @@ jobs:
             ${{ github.workspace }}/compilation-graph.json
             ${{ github.workspace }}/dependency-vulnerabilities.json
             ${{ github.workspace }}/reachability-results.json
+            ${{ github.workspace }}/resolver-evaluation-record.json
             ${{ github.workspace }}/validator-diagnostics.json

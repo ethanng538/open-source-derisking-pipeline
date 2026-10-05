@@ -19,6 +19,7 @@ function runResolverValidator() {
   console.log("=== Validating reachability results ===\n");
 
   console.log(">>> Phase 1: structural validation");
+
   if (!fs.existsSync('reachability-results.json')) {
     console.error("PHASE 1 ERROR: 'reachability-results.json' not found. Reachability validator did not run.");
     process.exit(1);
