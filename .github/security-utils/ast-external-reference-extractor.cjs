@@ -5,8 +5,8 @@ const path = require('path');
 
 function cleanQueryAndLoaders(rawString) {
   if (typeof rawString !== 'string' || !rawString) return '';
-  let target = rawString.split('?')[0]; // Drops query variables
-  if (target.includes('!')) { target = target.split('!').pop(); } // Drops loader syntax
+  let target = rawString.split('?')[0];
+  if (target.includes('!')) { target = target.split('!').pop(); }
   return target.trim();
 }
 
@@ -25,13 +25,11 @@ function resolveLocalPath(currentFile, importString) {
   return null;
 }
 
-/**
- * Parses raw code text via Acorn and extracts all string references.
- * Completely blind to audit data or vulnerability status.
- */
 function extractFileMetadata(filePath, codeText) {
   const localLinks = new Set();
   const rawPackages = new Set();
+  const usedIdentifiers = new Set();
+  const importBindings = new Map();
   let isAmbiguous = false;
 
   try {
@@ -42,50 +40,93 @@ function extractFileMetadata(filePath, codeText) {
       allowReturnOutsideFunction: true
     });
 
-      function walk(node) {
-        if (!node || isAmbiguous) return;
+    function walk(node) {
+      if (!node || isAmbiguous) return;
 
-        function processStringValue(val) {
-          if (typeof val !== 'string' || !val) return;
-          if (val.startsWith('.')) {
-            const resolved = resolveLocalPath(filePath, val);
-            if (resolved) localLinks.add(resolved);
+      function processStringValue(val) {
+        if (typeof val !== 'string' || !val) return '';
+        const cleanVal = cleanQueryAndLoaders(val);
+        if (cleanVal.startsWith('.')) {
+          const resolved = resolveLocalPath(filePath, cleanVal);
+          if (resolved) {
+            localLinks.add(resolved);
+            return resolved;
+          }
+        } else {
+          rawPackages.add(cleanVal);
+          return cleanVal;
+        }
+        return '';
+      }
+
+      if (node.type === 'ImportDeclaration' && node.source) {
+        if (node.source.type === 'Literal') {
+          const resolvedString = processStringValue(node.source.value);
+          if (resolvedString && node.specifiers) {
+            node.specifiers.forEach(spec => {
+              if (spec.local && spec.local.name) {
+                importBindings.set(spec.local.name, resolvedString);
+              }
+            });
+          }
+        } else isAmbiguous = true;
+      }
+
+      if (node.type === 'ImportExpression') {
+        if (node.source && node.source.type === 'Literal') processStringValue(node.source.value);
+        else isAmbiguous = true;
+      }
+
+      if (node.type === 'CallExpression' && node.callee && node.callee.name === 'require') {
+        const args = node.arguments;
+        if (args && args.length > 0) {
+          if (args[0].type === 'Literal') {
+            const resolvedString = processStringValue(args[0].value);
+            if (resolvedString && node.parent && node.parent.type === 'VariableDeclarator' && node.parent.id.type === 'Identifier') {
+              importBindings.set(node.parent.id.name, resolvedString);
+            }
+          } else isAmbiguous = true;
+        }
+      }
+
+      if (node.type === 'Identifier') {
+        const parentType = node.parent && node.parent.type;
+
+        const isImportDeclaration =
+          parentType === 'ImportSpecifier' ||
+          parentType === 'ImportDefaultSpecifier' ||
+          parentType === 'ImportNamespaceSpecifier';
+
+        const isObjectKeyOrProperty =
+          (parentType === 'Property' && node.parent.key === node && !node.parent.shorthand) ||
+          (parentType === 'MemberExpression' && node.parent.property === node && !node.parent.computed);
+
+        if (!isImportDeclaration && !isObjectKeyOrProperty) {
+          usedIdentifiers.add(node.name);
+        }
+      }
+
+      if (node.type === 'Literal') processStringValue(node.value);
+
+      if (node.type === 'TemplateLiteral' && node.quasis) {
+        node.quasis.forEach(q => { if (q.value && q.value.cooked) processStringValue(q.value.cooked); });
+      }
+
+      for (const key in node) {
+        if (node[key] && typeof node[key] === 'object') {
+          if (!Array.isArray(node[key])) node[key].parent = node;
+
+          if (Array.isArray(node[key])) {
+            node[key].forEach(subNode => {
+              if (subNode && typeof subNode === 'object') subNode.parent = node;
+              walk(subNode);
+            });
           } else {
-            rawPackages.add(cleanQueryAndLoaders(val));
-          }
-        }
-
-        if (node.type === 'ImportDeclaration' && node.source) {
-          if (node.source.type === 'Literal') processStringValue(node.source.value);
-          else isAmbiguous = true;
-        }
-
-        if (node.type === 'ImportExpression') {
-          if (node.source && node.source.type === 'Literal') processStringValue(node.source.value);
-          else isAmbiguous = true;
-        }
-
-        if (node.type === 'CallExpression' && node.callee && node.callee.name === 'require') {
-          const args = node.arguments;
-          if (args && args.length > 0) {
-            if (args[0].type === 'Literal') processStringValue(args[0].value);
-            else isAmbiguous = true;
-          }
-        }
-
-        if (node.type === 'Literal') processStringValue(node.value);
-
-        if (node.type === 'TemplateLiteral' && node.quasis) {
-          node.quasis.forEach(q => { if (q.value && q.value.cooked) processStringValue(q.value.cooked); });
-        }
-
-        for (const key in node) {
-          if (node[key] && typeof node[key] === 'object') {
-            if (Array.isArray(node[key])) node[key].forEach(walk);
-            else walk(node[key]);
+            walk(node[key]);
           }
         }
       }
+    }
 
     walk(ast);
   } catch (err) {
@@ -96,7 +137,6 @@ function extractFileMetadata(filePath, codeText) {
     while ((match = importRegex.exec(codeText)) !== null) {
       foundReferences = true;
       const val = match[1] || match[2];
-
       if (val.startsWith('.')) {
         const resolved = resolveLocalPath(filePath, val);
         if (resolved) localLinks.add(resolved);
@@ -104,9 +144,23 @@ function extractFileMetadata(filePath, codeText) {
         rawPackages.add(cleanQueryAndLoaders(val));
       }
     }
-
     isAmbiguous = !foundReferences && codeText.includes('import');
   }
+
+  const activeImports = new Set();
+  importBindings.forEach((importString, variableName) => {
+    if (usedIdentifiers.has(variableName)) {
+      activeImports.add(importString);
+    }
+  });
+
+  importBindings.forEach((importString, variableName) => {
+    if (!activeImports.has(importString)) {
+      rawPackages.delete(importString);
+      localLinks.delete(importString);
+    }
+  });
+
   return {
     isAmbiguous,
     localLinks: Array.from(localLinks),
