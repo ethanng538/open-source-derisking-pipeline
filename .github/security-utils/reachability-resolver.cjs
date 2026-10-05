@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-const { getLogicalModuleKey } = require('./path-utils.cjs');
-
 function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -107,15 +105,14 @@ function runReachabilityResolver() {
       vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
     }
 
-    const formattedLogicalPath = getLogicalModuleKey(node.filePath);
-    evaluatedKeys.push(formattedLogicalPath);
+    evaluatedKeys.push(node.filePath);
 
     if (vulnerabilityStatus === 'SAFE') {
       return;
     }
 
     const findingRecord = {
-      filePath: formattedLogicalPath,
+      filePath: node.filePath,
       status: vulnerabilityStatus
     };
 

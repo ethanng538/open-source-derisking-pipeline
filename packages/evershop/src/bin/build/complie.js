@@ -47,18 +47,28 @@ function runOne(config) {
           const rawWarnings = stats.compilation.warnings || [];
 
           rawModules.forEach(mod => {
-            let absoluteResource = mod.resource;
+            const originalSources = mod.sourceMap?.sources;
 
-            if (!absoluteResource && mod.modules && Array.isArray(mod.modules)) {
+            if (originalSources && originalSources.length > 0) {
+              originalSources.forEach(sourcePath => {
+                if (mod.resource) {
+                  const absoluteSrcPath = path.resolve(path.dirname(mod.resource), sourcePath);
+                  uniqueDiskPaths.add(absoluteSrcPath);
+                }
+              });
+              return;
+            }
+
+            if (!mod.resource && mod.modules && Array.isArray(mod.modules)) {
               mod.modules.forEach(subMod => {
                 if (subMod.resource) uniqueDiskPaths.add(subMod.resource);
               });
               return;
             }
 
-            if (!absoluteResource) return;
-
-            uniqueDiskPaths.add(absoluteResource);
+            if (mod.resource) {
+              uniqueDiskPaths.add(mod.resource);
+            }
           });
 
           rawWarnings.forEach(warn => {
@@ -121,6 +131,7 @@ export async function compile(routes) {
     frontend: Array.from(new Set(clientResult.compiledModules)),
     backend: Array.from(new Set(serverResult.compiledModules)),
     appSource: Array.from(allBundledPaths).filter(p =>
+      p.includes(path.join('packages', 'evershop', 'src')) ||
       p.includes(path.join('packages', 'evershop', 'dist')) ||
       p.includes(path.join('extensions'))
     ),
