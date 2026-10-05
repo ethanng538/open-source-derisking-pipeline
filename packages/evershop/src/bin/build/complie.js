@@ -131,12 +131,7 @@ export async function compile(routes) {
     frontend: Array.from(new Set(clientResult.compiledModules)),
     backend: Array.from(new Set(serverResult.compiledModules)),
     appSource: Array.from(allBundledPaths).map(p => {
-      const physicalDistMarker = path.join('packages', 'evershop', 'dist');
-      const logicalSrcMarker = path.join('packages', 'evershop', 'src');
-
-      return p.includes(physicalDistMarker)
-        ? p.replace(physicalDistMarker, logicalSrcMarker)
-        : p;
+      return p.replace(/\/dist\//, '/src/');
     }).filter(p =>
       p.includes(path.join('packages', 'evershop', 'src')) ||
       p.includes(path.join('extensions'))

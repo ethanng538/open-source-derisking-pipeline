@@ -56,6 +56,8 @@ the compiler's own metadata to explicitly map web and node infrastructure:
 ### Leveraging AST analysis
 AST tools deterministically know the meanings of code statements.
 
+Unused imports are pruned at this stage.
+
 ### Producing the Initial Search Space
 
 

@@ -49,10 +49,21 @@ function runResolverValidator() {
 
   const webpackGraph = safeReadJson(graphPath);
 
-  const compiledAssetGraph = new Set([
+  const rawWebpackPaths = [
     ...(webpackGraph.frontend || []),
     ...(webpackGraph.backend || [])
-  ].map(p => path.normalize(p)));
+  ].map(p => path.normalize(p));
+
+  const compiledAssetGraph = new Set();
+
+  rawWebpackPaths.forEach(p => {
+    compiledAssetGraph.add(p);
+    if (p.endsWith('.js')) {
+      compiledAssetGraph.add(p.replace(/\.js$/, '.tsx'));
+      compiledAssetGraph.add(p.replace(/\.js$/, '.ts'));
+      compiledAssetGraph.add(p.replace(/\.js$/, '.jsx'));
+    }
+  });
 
   const finderFiles = new Set((finderOutput.findings || []).map(f => path.normalize(f.filePath)));
   // The intersection between the compilation graph and files with potential vulnerabilities
@@ -75,11 +86,11 @@ function runResolverValidator() {
     }
 
     const normalisedPath = path.normalize(finding.filePath);
-    const isAssetCompiled = compiledAssetGraph.has(finding.filePath);
+    const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
 
     // Multi-state breach check
     if (findingsTrackingSet.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
-      errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times with conflicting explicit states.`);
+      errorLog.push(`MULTI-STATE BREACH: File '${normalisedPath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
 
@@ -87,7 +98,7 @@ function runResolverValidator() {
       continue;
     }
 
-    if (resolverFiles.has(finding.filePath) && finding.status === 'PENDING_EVALUATION') {
+    if (resolverFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
       totalRecordsChecked++;
       continue;
     }
@@ -101,11 +112,11 @@ function runResolverValidator() {
 
     // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Resolver flagged '${finding.filePath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Resolver flagged '${normalisedPath}' as REACHABLE but it is completely missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
-    resolverFiles.add(finding.filePath);
+    resolverFiles.add(normalisedPath);
     totalRecordsChecked++;
   }
 
