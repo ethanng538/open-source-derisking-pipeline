@@ -49,6 +49,7 @@ function runResolverValidator() {
   ].map(p => path.normalize(p)));
 
   const resolverFiles = new Set(resolverOutput.records || []);
+  const findingsTrackingSet = new Set();
   let totalRecordsChecked = resolverOutput.records ? resolverOutput.records.length : 0;
   let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
@@ -60,12 +61,17 @@ function runResolverValidator() {
       continue;
     }
 
+    const normalisedPath = path.normalize(finding.filePath);
     const isAssetCompiled = compiledAssetGraph.has(finding.filePath);
 
     // Multi-state breach check
-    if (resolverFiles.has(finding.filePath) && finding.status !== 'PENDING_EVALUATION') {
+    if (findingsTrackingSet.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
       errorLog.push(`MULTI-STATE BREACH: File '${finding.filePath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
+    }
+
+    if (findingsTrackingSet.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
+      continue;
     }
 
     if (resolverFiles.has(finding.filePath) && finding.status === 'PENDING_EVALUATION') {
@@ -121,7 +127,7 @@ function runResolverValidator() {
   // Completeness reverse-audit: ensures the reachability resolver didn't bypass any file actively bundled by the compilers.
   if (webpackGraph.appSource && Array.isArray(webpackGraph.appSource)) {
     for (const sourceAsset of webpackGraph.appSource) {
-      if (!resolverFiles.has(sourceAsset)) {
+      if (!findingsTrackingSet.has(sourceAsset)) {
         errorLog.push(`COMPLETENESS BREACH: The compiler bundled source module '${sourceAsset}' but the resolver missed evaluating it.`);
         pipelineFailed = true;
       }
