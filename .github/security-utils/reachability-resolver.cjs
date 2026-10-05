@@ -10,6 +10,21 @@ function safeReadJson(filePath) {
   }
 }
 
+// Evaluates whether a file is an implicit entry point bound by EverShop conventions
+function isFrameworkEntryPoint(normalisedPath) {
+
+  return (
+    normalisedPath.includes('/src/pages/') ||
+    normalisedPath.includes('/src/api/') ||
+    normalisedPath.includes('/src/graphql/') ||
+    normalisedPath.includes('/src/subscribers/') ||
+    normalisedPath.includes('/src/migration/') ||
+    normalisedPath.endsWith('/bootstrap.ts') ||
+    normalisedPath.endsWith('/bootstrap.js')
+
+  );
+}
+
 function runReachabilityResolver() {
   console.log("=== Running reachability-resolver ===");
 
@@ -22,13 +37,10 @@ function runReachabilityResolver() {
   const dependencyVulnerabilityFinderOutput = safeReadJson(potentialVulnerabilitiesPath);
   const potentialVulnerabilities = dependencyVulnerabilityFinderOutput.findings;
 
-  const finderFindingsMap = new Map();
   const incomingLinksMap = new Map(); // Key: file being imported, Value: set of files importing it
 
-  // Builds the graph utilising the finder's pre-computed localLinks
   potentialVulnerabilities.forEach(node => {
     const normalisedPath = path.normalize(node.filePath);
-    finderFindingsMap.set(normalisedPath, node);
 
     if (node.localLinks && Array.isArray(node.localLinks)) {
       node.localLinks.forEach(linkedFile => {
@@ -41,21 +53,6 @@ function runReachabilityResolver() {
       });
     }
   });
-
-  // Defines operational application entry criteria
-  function isRuntimeApplicationRoot(normalisedPath) {
-    const incomingImports = incomingLinksMap.get(normalisedPath);
-    const totalInboundReferences = incomingImports ? incomingImports.size : 0;
-
-    if (normalisedPath.includes(path.join('pages'))) {
-      const parentDir = path.dirname(normalisedPath);
-      const hasRouteJson = fs.existsSync(path.join(parentDir, 'route.json'));
-
-      return hasRouteJson && totalInboundReferences > 0;
-    }
-
-    return false;
-  }
 
   const verifiedReachableFiles = new Set();
   const evaluatedVulnerableFiles = potentialVulnerabilities.filter(f => f.status === 'PENDING_EVALUATION');
@@ -72,7 +69,7 @@ function runReachabilityResolver() {
     while (traversalQueue.length > 0) {
       const currentFile = traversalQueue.shift();
 
-      if (isRuntimeApplicationRoot(currentFile)) {
+      if (isFrameworkEntryPoint(currentFile)) {
         traceIsReachable = true;
         break;
       }
@@ -125,24 +122,20 @@ function runReachabilityResolver() {
 
   const timestamp = new Date().toISOString();
 
-  const outputPayload = {
+  fs.writeFileSync('reachability-results.json', JSON.stringify({
     generatedAt: timestamp,
     findings: findings,
     records: resolverRecords
-  };
+  }, null, 2), 'utf8');
 
-  fs.writeFileSync('reachability-results.json', JSON.stringify(outputPayload, null, 2), 'utf8');
-
-  const telemetryOutputPayload = {
+  fs.writeFileSync('resolver-evaluation-record.json', JSON.stringify({
     generatedAt: timestamp,
     summary: {
       totalInputRecords: potentialVulnerabilities.length,
       findingsLogged: findings.length
     },
     records: resolverRecords
-  };
-
-  fs.writeFileSync('resolver-evaluation-record.json', JSON.stringify(telemetryOutputPayload, null, 2), 'utf8');
+  }, null, 2), 'utf8');
 
   const totalEvaluated = findings.length;
   const reachableCount = findings.filter(f => f.status === 'REACHABLE').length;
