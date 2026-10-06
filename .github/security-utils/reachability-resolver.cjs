@@ -92,6 +92,7 @@ function runReachabilityResolver() {
 
   // Compile final clean payload mapping
   const findings = [];
+  const evaluations = [];
   const resolverRecords = [];
 
   potentialVulnerabilities.forEach(node => {
@@ -102,7 +103,16 @@ function runReachabilityResolver() {
       vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
     }
 
-    resolverRecords.push(node.filePath);
+    resolverRecords.push(normalisedPath);
+
+    const evaluationRecord = {
+      filePath: normalisedPath,
+      status: vulnerabilityStatus
+    };
+    if (node.meta) {
+      evaluationRecord.meta = node.meta;
+    }
+    evaluations.push(evaluationRecord);
 
     if (vulnerabilityStatus === 'SAFE') {
       return;
@@ -125,7 +135,6 @@ function runReachabilityResolver() {
   fs.writeFileSync('reachability-results.json', JSON.stringify({
     generatedAt: timestamp,
     findings: findings,
-    records: resolverRecords
   }, null, 2), 'utf8');
 
   fs.writeFileSync('resolver-evaluation-record.json', JSON.stringify({
@@ -134,7 +143,8 @@ function runReachabilityResolver() {
       totalInputRecords: potentialVulnerabilities.length,
       findingsLogged: findings.length
     },
-    records: resolverRecords
+    records: resolverRecords,
+    evaluations: evaluations
   }, null, 2), 'utf8');
 
   const totalEvaluated = findings.length;

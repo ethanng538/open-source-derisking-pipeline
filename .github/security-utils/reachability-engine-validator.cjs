@@ -20,12 +20,20 @@ function runResolverValidator() {
 
   console.log(">>> Phase 1: structural validation");
 
+  if (!fs.existsSync('dependency-vulnerabilities.json')) {
+    console.error("PHASE 1 ERROR: 'dependency-vulnerabilities.json' not found. Potential vulnerability results is missing.");
+    process.exit(1);
+  }
+
+  // Just files found to be not safe by the resolver
   if (!fs.existsSync('reachability-results.json')) {
     console.error("PHASE 1 ERROR: 'reachability-results.json' not found. Reachability validator did not run.");
     process.exit(1);
   }
-  if (!fs.existsSync('dependency-vulnerabilities.json')) {
-    console.error("PHASE 1 ERROR: 'dependency-vulnerabilities.json' not found. Finder telemetry is missing.");
+
+  // All files evaluated by the resolver
+  if (!fs.existsSync('resolver-evaluation-record.json')) {
+    console.error("PHASE 1 ERROR: 'resolver-evaluation-record.json' not found. Resolver records are not available.");
     process.exit(1);
   }
 

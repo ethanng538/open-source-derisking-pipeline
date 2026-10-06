@@ -10,12 +10,12 @@ This pipeline is strictly constrained to known, publicly documented third-party 
 establish a deterministic control group for validating reachability logic.
 
 ### Role in the Security Ecosystem
-This pipeline operates strictly as a build-time static gate. Its role is to enforce that no structural risks introduced
+This pipeline operates strictly as a build-time gate. Its role is to enforce that no structural risks introduced
 by external modules make it to deployment.
 
-Reachability analysis domains such as dynamic runtime reachability will not be incorporated given that
-it cannot be optimally resolved in a CI/CD pipeline. This maintains an acceptable build time while reducing design drift
-when implementing the logic for the reachability resolver.
+Reachability analysis domains such as dynamic reachability will not be incorporated given that it cannot be
+optimally resolved inside a CI/CD pipeline. This maintains an acceptable build time while reducing design drift into
+evaluating dynamic, build-time traces.
 
 ---
 
