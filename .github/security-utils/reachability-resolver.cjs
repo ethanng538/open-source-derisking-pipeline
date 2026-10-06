@@ -1,14 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-function safeReadJson(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (err) {
-    console.error(`RESOLVER ERROR: Cannot read ${filePath}`);
-    process.exit(1);
-  }
-}
+const { safeReadJson } = require('./shared-utils.cjs');
+
 
 // Evaluates whether a file is an implicit entry point bound by EverShop conventions
 function isFrameworkEntryPoint(normalisedPath) {
@@ -156,7 +150,7 @@ function runReachabilityResolver() {
   console.log(`Total evaluated: ${totalEvaluated} target records`);
   console.log("---");
   console.log(`🔴 REACHABLE risks: ${reachableCount}`);
-  console.log(`🟡 WARNINGS: ${ambiguousCount}`);
+  console.log(`🟡 WARNINGS: ${ambiguousCount} (resolved via AST)`);
   console.log(`⚪ MUTED risks: ${mutedCount}`);
 }
 

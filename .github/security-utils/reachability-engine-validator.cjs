@@ -1,14 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function safeReadJson(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (err) {
-    console.error(`CONFIG ERROR: Failed to read or parse file at ${filePath}`);
-    process.exit(1);
-  }
-}
+const { safeReadJson, stripExtension } = require('./shared-utils.cjs');
 
 
 function runResolverValidator() {
@@ -74,20 +67,43 @@ function runResolverValidator() {
   const compiledAssetGraph = new Set([
     ...(webpackGraph.frontend || []),
     ...(webpackGraph.backend || [])
-  ].map(p => path.normalize(p)));
+  ].map(p => {
+    const normalised = path.normalize(p);
+    const sourceAligned = normalised.replace(/[\\/]dist[\\/]/, '/src/');
+    return stripExtension(sourceAligned);
+  }));
 
   // The intersection between the compilation graph and files with potential vulnerabilities
   const pendingFinderFiles = new Set(
-    (finderOutput.findings || [])
+    (finderOutput.findings)
       .filter(f => f.status === 'PENDING_EVALUATION')
-      .map(f => path.normalize(f.filePath))
+      .map(f => stripExtension(path.normalize(f.filePath)))
   );
-  const securitySearchSpace = new Set(
-    (webpackGraph.appSource || []).map(p => path.normalize(p)).filter(p => pendingFinderFiles.has(p))
+  const validatorSearchSpace = new Set(
+    (webpackGraph.appSource)
+      .map(p => stripExtension(path.normalize(p)))
+      .filter(p => pendingFinderFiles.has(p))
   );
 
-  const evaluatedFiles = new Set(reachabilityEvaluationRecord.records);
-  const resolverEvaluations = reachabilityEvaluationRecord.evaluations;
+  const searchSpacePayload = {
+    generatedAt: new Date().toISOString(),
+    totalSuspectModulesTracked: validatorSearchSpace.size,
+    searchSpacePaths: Array.from(validatorSearchSpace).sort()
+  };
+
+  fs.writeFileSync(
+    path.join(process.cwd(), 'validator-search-space.json'),
+    JSON.stringify(searchSpacePayload, null, 2),
+    'utf8'
+  );
+
+  const evaluatedFiles = new Set(
+    (reachabilityEvaluationRecord.records).map(p => stripExtension(path.normalize(p)))
+  );
+  const resolverEvaluations = (reachabilityEvaluationRecord.evaluations).map(e => ({
+    filePath: stripExtension(path.normalize(e.filePath)),
+    status: e.status
+  }));
 
   // Used to check for duplicate entries
   const processedResolverFiles = new Set();
@@ -104,18 +120,18 @@ function runResolverValidator() {
       continue;
     }
 
-    const normalisedPath = path.normalize(evaluation.filePath);
-    const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
+    const targetPath = evaluation.filePath;
+    const isAssetCompiled = compiledAssetGraph.has(targetPath);
 
     // Multi-state breach check
-    if (processedResolverFiles.has(normalisedPath)) {
-      errorLog.push(`MULTI-STATE BREACH: File '${normalisedPath}' was defined multiple times with conflicting explicit states.`);
+    if (processedResolverFiles.has(targetPath)) {
+      errorLog.push(`MULTI-STATE BREACH: File '${targetPath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
-    processedResolverFiles.add(normalisedPath);
+    processedResolverFiles.add(targetPath);
 
     if (evaluation.status === 'PENDING_EVALUATION') {
-      errorLog.push(`UNASSIGNED EVALUATION BREACH: File '${normalisedPath}' was passed through without being resolved to SAFE, REACHABLE or MUTED.`);
+      errorLog.push(`UNASSIGNED EVALUATION BREACH: File '${targetPath}' was passed through without being resolved to SAFE, REACHABLE or MUTED.`);
       pipelineFailed = true;
       continue;
     }
@@ -127,7 +143,7 @@ function runResolverValidator() {
 
     // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Resolver flagged '${normalisedPath}' as REACHABLE but it is missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Resolver flagged '${targetPath}' as REACHABLE but it is missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
@@ -151,8 +167,8 @@ function runResolverValidator() {
   }
 
   // Completeness reverse-audit: ensures the reachability resolver didn't miss any file actively bundled by the compiler
-  for (const sourceAsset of securitySearchSpace) {
-    if (!resolverFindings.has(sourceAsset)) {
+  for (const sourceAsset of validatorSearchSpace) {
+    if (!evaluatedFiles.has(sourceAsset)) {
       errorLog.push(`COMPLETENESS BREACH: The compiler bundled vulnerable suspect module '${sourceAsset}' but the reachability resolver missed evaluating it.`);
       pipelineFailed = true;
     }
@@ -195,7 +211,7 @@ function runResolverValidator() {
     errors: errorLog,
     warnings: warningLog,
     webpackGraphSize: compiledAssetGraph.size,
-    securitySearchSpaceSize: securitySearchSpace.size,
+    validatorSearchSpaceSize: validatorSearchSpace.size,
     resolverRecordsSize: evaluatedFiles.size
   };
 

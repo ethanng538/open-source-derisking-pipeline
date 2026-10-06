@@ -93,3 +93,4 @@ jobs:
             ${{ github.workspace }}/reachability-results.json
             ${{ github.workspace }}/resolver-evaluation-record.json
             ${{ github.workspace }}/validator-diagnostics.json
+            ${{ github.workspace }}/validator-search-space.json
