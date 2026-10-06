@@ -54,16 +54,15 @@ function runReachabilityResolver() {
     }
   });
 
-  const verifiedReachableFiles = new Set();
-  const evaluatedVulnerableFiles = potentialVulnerabilities.filter(f => f.status === 'PENDING_EVALUATION');
+  const reachableFiles = new Set();
+  const nodesPendingEvaluation = potentialVulnerabilities.filter(f => f.status === 'PENDING_EVALUATION');
+  let totalEvaluated = 0;
 
-  console.log(`Analysing ${evaluatedVulnerableFiles.length} vulnerable target nodes discovered by finder...`);
+  nodesPendingEvaluation.forEach(vulnerableNode => {
+    const targetPath = path.normalize(vulnerableNode.filePath);
 
-  evaluatedVulnerableFiles.forEach(vulnerableNode => {
-    const startPath = path.normalize(vulnerableNode.filePath);
-
-    const traversalQueue = [startPath];
-    const visitedInThisTrace = new Set([startPath]);
+    const traversalQueue = [targetPath];
+    const visitedInThisTrace = new Set([targetPath]);
     let traceIsReachable = false;
 
     while (traversalQueue.length > 0) {
@@ -86,8 +85,10 @@ function runReachabilityResolver() {
     }
 
     if (traceIsReachable) {
-      verifiedReachableFiles.add(startPath);
+      reachableFiles.add(targetPath);
     }
+
+    totalEvaluated++;
   });
 
   // Compile final clean payload mapping
@@ -100,7 +101,7 @@ function runReachabilityResolver() {
     let vulnerabilityStatus = node.status;
 
     if (node.status === 'PENDING_EVALUATION') {
-      vulnerabilityStatus = verifiedReachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
+      vulnerabilityStatus = reachableFiles.has(normalisedPath) ? 'REACHABLE' : 'MUTED';
     }
 
     resolverRecords.push(normalisedPath);
@@ -147,7 +148,6 @@ function runReachabilityResolver() {
     evaluations: evaluations
   }, null, 2), 'utf8');
 
-  const totalEvaluated = findings.length;
   const reachableCount = findings.filter(f => f.status === 'REACHABLE').length;
   const ambiguousCount = findings.filter(f => f.status === 'AMBIGUOUS').length;
   const mutedCount = findings.filter(f => f.status === 'MUTED').length;
