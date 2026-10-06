@@ -49,21 +49,10 @@ function runResolverValidator() {
 
   const webpackGraph = safeReadJson(graphPath);
 
-  const rawWebpackPaths = [
+  const compiledAssetGraph = new Set([
     ...(webpackGraph.frontend || []),
     ...(webpackGraph.backend || [])
-  ].map(p => path.normalize(p));
-
-  const compiledAssetGraph = new Set();
-
-  rawWebpackPaths.forEach(p => {
-    compiledAssetGraph.add(p);
-    if (p.endsWith('.js')) {
-      compiledAssetGraph.add(p.replace(/\.js$/, '.tsx'));
-      compiledAssetGraph.add(p.replace(/\.js$/, '.ts'));
-      compiledAssetGraph.add(p.replace(/\.js$/, '.jsx'));
-    }
-  });
+  ].map(p => path.normalize(p)));
 
   const finderFiles = new Set((finderOutput.findings || []).map(f => path.normalize(f.filePath)));
   // The intersection between the compilation graph and files with potential vulnerabilities

@@ -109,7 +109,7 @@ function runReachabilityResolver() {
     }
 
     const findingRecord = {
-      filePath: node.filePath,
+      filePath: normalisedPath,
       status: vulnerabilityStatus
     };
 
