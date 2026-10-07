@@ -1,28 +1,33 @@
 # Dependency Vulnerability Reachability Pipeline
 
-> ## 📢 The Architectural Strategy
+> ### 📢 The Architectural Strategy
 > This repository documents a self-directed architectural deep dive into reachability-driven vulnerability detection.
-> The core focus centres on distinguishing between active risk and dormant vulnerabilities, analysing whether a flagged
-> external module actually executes or sits inactive in the codebase.
+> The core focus centres on the identification of confirmed risk, de-risking the adoption of open-source code and
+> flagging structural risks during development.
 
 ## 🔬 The Scope
-This pipeline is strictly constrained to known, publicly documented third-party dependency vulnerabilities (CVEs) to
-establish a deterministic control group for validating reachability logic.
+My pipeline will operate purely within CI, using static analysis to map out a system's potential vulnerabilities
+before evaluating whether they pose a confirmed risk.
+
+This pipeline is deliberately constrained to vulnerabilities originating from third-party dependencies. Grounding my
+reachability analysis to CVE data provides me a verified baseline and directly addresses weaknesses of static analysis
+such as high numbers of false positives.
 
 ### Role in the Security Ecosystem
-This pipeline operates strictly as a build-time gate. Its role is to enforce that no structural risks introduced
+Functioning as a build-time security gate, its role is to enforce that no structural risks introduced
 by external modules make it to deployment.
 
 Reachability analysis domains such as dynamic reachability will not be incorporated given that it cannot be
-optimally resolved inside a CI/CD pipeline. This maintains an acceptable build time while reducing design drift into
-evaluating dynamic, build-time traces.
+optimally resolved inside a CI pipeline. This maintains an acceptable build time during development and merges while
+reducing design drift into evaluating dynamic, build-time traces.
 
 ---
 
 ## 🛠️ System & Pipeline Architecture
-My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) repository to provide a real-world baseline for my pipeline. Using a modern tech
-stack and an API that unifies both admin and storefront operations, it acts as a realistic benchmark to evaluate my
-project outcomes.
+My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) repository to provide a real-world baseline for my pipeline.
+
+The EverShop framework provides core modules to help anyone create a highly customisable e-commerce platform and serves
+as a realistic benchmark to evaluate the effectiveness of my pipeline.
 
 The structure of my pipeline is as follows:
 ```text
@@ -48,5 +53,4 @@ Strict compliance gates are used to verify the system's output,
 blocking the build if data contradictions or insufficient coverage is found.
 ```
 
-👉 **To inspect the custom validation scripts, read the real execution telemetry records or review the step-by-step
-pipeline logging outputs, view the** [Reachability Pipeline Architecture Runbook](./ARCHITECTURE_RUNBOOK.md).
+👉 **To view my design decisions in-depth, view the** [Reachability Pipeline Architecture Runbook](./ARCHITECTURE_RUNBOOK.md).

@@ -1,4 +1,4 @@
-# 📓 Architecture Runbook: Verifiable AppSec
+# 📓 Reachability Pipeline Architecture Runbook
 
 This document serves as the chronological engineering ledger for this project. It details my validation-first approach
 to designing my security pipeline, key design considerations and core implementation details.
@@ -11,6 +11,9 @@ to designing my security pipeline, key design considerations and core implementa
 An analysis engine cannot safely grade its own homework, meaning there must exist a separate process that evaluates the
 accuracy of any reachability results. Moreover, EverShop uses a unique architecture that orchestrates its own
 compilation loops behind the scenes, increasing the likelihood of data mapping errors in any implementation.
+
+Static analysis cannot resolve whether a file is actually reachable, only whether it contains evidence of exposure
+should the file, or linked files, be executed.
 
 ### The Invariant Matrix
 When considering the output of a reachability analysis in the context of third-party dependencies, a file would receive
