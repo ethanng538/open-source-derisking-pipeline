@@ -1,14 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function safeReadJson(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (err) {
-    console.error(`CONFIG ERROR: Failed to read or parse file at ${filePath}`);
-    process.exit(1);
-  }
-}
+const { safeReadJson, stripExtension } = require('./shared-utils.cjs');
 
 
 function runResolverValidator() {
@@ -37,11 +30,25 @@ function runResolverValidator() {
     process.exit(1);
   }
 
-  const resolverOutput = safeReadJson('reachability-results.json');
   const finderOutput = safeReadJson('dependency-vulnerabilities.json');
+  const reachabilityOutput = safeReadJson('reachability-results.json');
+  const reachabilityEvaluationRecord = safeReadJson('resolver-evaluation-record.json');
 
-  if (!resolverOutput.findings || !Array.isArray(resolverOutput.findings)) {
+  if (!finderOutput.findings || !Array.isArray(finderOutput.findings)) {
+    console.error("PHASE 1 ERROR: Finder results is missing a valid 'findings' array.");
+    process.exit(1);
+  }
+
+  if (!reachabilityOutput.findings || !Array.isArray(reachabilityOutput.findings)) {
     console.error("PHASE 1 ERROR: Resolver results is missing a valid 'findings' array.");
+    process.exit(1);
+  }
+
+  if (
+    !reachabilityEvaluationRecord.records || !Array.isArray(reachabilityEvaluationRecord.records) ||
+    !reachabilityEvaluationRecord.evaluations || !Array.isArray(reachabilityEvaluationRecord.evaluations)
+  ) {
+    console.error("PHASE 1 ERROR: Resolver record is missing a valid 'records' or 'evaluations' array.");
     process.exit(1);
   }
 
@@ -60,72 +67,86 @@ function runResolverValidator() {
   const compiledAssetGraph = new Set([
     ...(webpackGraph.frontend || []),
     ...(webpackGraph.backend || [])
-  ].map(p => path.normalize(p)));
+  ].map(p => {
+    const normalised = path.normalize(p);
+    const sourceAligned = normalised.replace(/[\\/]dist[\\/]/, '/src/');
+    return stripExtension(sourceAligned);
+  }));
 
-  const finderFiles = new Set((finderOutput.findings || []).map(f => path.normalize(f.filePath)));
   // The intersection between the compilation graph and files with potential vulnerabilities
-  const securitySearchSpace = new Set(
-    (webpackGraph.appSource || []).map(p => path.normalize(p)).filter(p => finderFiles.has(p))
+  const pendingFinderFiles = new Set(
+    (finderOutput.findings)
+      .filter(f => f.status === 'PENDING_EVALUATION')
+      .map(f => stripExtension(path.normalize(f.filePath)))
+  );
+  const validatorSearchSpace = new Set(
+    (webpackGraph.appSource)
+      .map(p => stripExtension(path.normalize(p)))
+      .filter(p => pendingFinderFiles.has(p))
   );
 
-  const resolverFiles = new Set(resolverOutput.records || []);
-  const findingsTrackingSet = new Set();
+  const searchSpacePayload = {
+    generatedAt: new Date().toISOString(),
+    totalSuspectModulesTracked: validatorSearchSpace.size,
+    searchSpacePaths: Array.from(validatorSearchSpace).sort()
+  };
 
-  let totalRecordsChecked = resolverOutput.records ? resolverOutput.records.length : 0;
+  fs.writeFileSync(
+    path.join(process.cwd(), 'validator-search-space.json'),
+    JSON.stringify(searchSpacePayload, null, 2),
+    'utf8'
+  );
+
+  const evaluatedFiles = new Set(
+    (reachabilityEvaluationRecord.records).map(p => stripExtension(path.normalize(p)))
+  );
+  const resolverEvaluations = (reachabilityEvaluationRecord.evaluations).map(e => ({
+    filePath: stripExtension(path.normalize(e.filePath)),
+    status: e.status
+  }));
+
+  // Used to check for duplicate entries
+  const processedResolverFiles = new Set();
+
+  let totalRecordsChecked = 0;
   let counts = { SAFE: 0, REACHABLE: 0, MUTED: 0, AMBIGUOUS: 0 };
 
-  for (const finding of resolverOutput.findings) {
-    if (!finding.filePath || !finding.status) {
-      errorLog.push(`Malformed record structure found at index ${totalRecordsChecked}`);
+  for (let i = 0; i < resolverEvaluations.length; i++) {
+    const evaluation = resolverEvaluations[i];
+
+    if (!evaluation.filePath || !evaluation.status) {
+      errorLog.push(`Malformed record structure found at index ${i}`);
       pipelineFailed = true;
-      totalRecordsChecked++;
       continue;
     }
 
-    const normalisedPath = path.normalize(finding.filePath);
-    const isAssetCompiled = compiledAssetGraph.has(normalisedPath);
+    const targetPath = evaluation.filePath;
+    const isAssetCompiled = compiledAssetGraph.has(targetPath);
 
     // Multi-state breach check
-    if (findingsTrackingSet.has(normalisedPath) && finding.status !== 'PENDING_EVALUATION') {
-      errorLog.push(`MULTI-STATE BREACH: File '${normalisedPath}' was defined multiple times with conflicting explicit states.`);
+    if (processedResolverFiles.has(targetPath)) {
+      errorLog.push(`MULTI-STATE BREACH: File '${targetPath}' was defined multiple times with conflicting explicit states.`);
       pipelineFailed = true;
     }
+    processedResolverFiles.add(targetPath);
 
-    if (findingsTrackingSet.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
+    if (evaluation.status === 'PENDING_EVALUATION') {
+      errorLog.push(`UNASSIGNED EVALUATION BREACH: File '${targetPath}' was passed through without being resolved to SAFE, REACHABLE or MUTED.`);
+      pipelineFailed = true;
       continue;
     }
 
-    if (resolverFiles.has(normalisedPath) && finding.status === 'PENDING_EVALUATION') {
-      totalRecordsChecked++;
-      continue;
+    const effectiveStatus = evaluation.status;
+    if (counts.hasOwnProperty(effectiveStatus)) {
+      counts[effectiveStatus]++;
     }
-
-    let effectiveStatus = finding.status;
-    if (finding.status === 'PENDING_EVALUATION') {
-      effectiveStatus = isAssetCompiled ? 'REACHABLE' : 'MUTED';
-    }
-
-    counts[effectiveStatus] = (counts[effectiveStatus] || 0) + 1;
 
     // Inclusion (reachable): if a file is a live risk, it must actively exist in the compiled asset graph.
     if (effectiveStatus === 'REACHABLE' && !isAssetCompiled) {
-      errorLog.push(`LOGIC BREACH: Resolver flagged '${normalisedPath}' as REACHABLE but it is completely missing from the active build graphs.`);
+      errorLog.push(`LOGIC BREACH: Resolver flagged '${targetPath}' as REACHABLE but it is missing from the active build graphs.`);
       pipelineFailed = true;
     }
 
-    resolverFiles.add(normalisedPath);
-    totalRecordsChecked++;
-  }
-
-  const filesWithAmbiguousDependencies = webpackGraph.unresolvedDynamicImports || [];
-
-  for (const warningFile of filesWithAmbiguousDependencies) {
-    const normalisedWarnPath = path.normalize(warningFile);
-
-    counts.AMBIGUOUS++;
-    warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${normalisedWarnPath}'`);
-
-    resolverFiles.add(warningFile);
     totalRecordsChecked++;
   }
 
@@ -145,16 +166,30 @@ function runResolverValidator() {
     }
   }
 
-  // Completeness reverse-audit: ensures the reachability resolver didn't bypass any file actively bundled by the compilers.
-  for (const sourceAsset of securitySearchSpace) {
-    if (!resolverFiles.has(sourceAsset)) {
-      errorLog.push(`COMPLETENESS BREACH: The compiler bundled vulnerable suspect module '${sourceAsset}' but the reachability resolver bypassed it.`);
+  // Completeness reverse-audit: ensures the reachability resolver didn't miss any file actively bundled by the compiler
+  for (const sourceAsset of validatorSearchSpace) {
+    if (!evaluatedFiles.has(sourceAsset)) {
+      errorLog.push(`COMPLETENESS BREACH: The compiler bundled vulnerable suspect module '${sourceAsset}' but the reachability resolver missed evaluating it.`);
       pipelineFailed = true;
     }
   }
 
+  const filesWithAmbiguousDependencies = webpackGraph.unresolvedDynamicImports;
+
+  for (const warningFile of filesWithAmbiguousDependencies) {
+    const normalisedWarnPath = path.normalize(warningFile);
+
+    if (!evaluatedFiles.has(normalisedWarnPath)) {
+      errorLog.push(`COMPLETENESS BREACH: The compiler detected an unresolved dynamic import in '${normalisedWarnPath}' but the reachability resolver missed evaluating it.`);
+      pipelineFailed = true;
+      continue;
+    }
+
+    warningLog.push(`Unresolved dynamic reference or variable expression origin found in: '${normalisedWarnPath}'`);
+  }
+
   // Evaluate statistical distribution
-  if (totalRecordsChecked > 0 && counts.REACHABLE === 0 && counts.MUTED === 0 && counts.SAFE === 0) {
+  if (totalRecordsChecked > 0 && counts.SAFE === 0 && counts.REACHABLE === 0 && counts.MUTED === 0 && counts.AMBIGUOUS === 0) {
     errorLog.push(`TRIVIAL PAYLOAD BREACH: Resolver failed statistical distribution check. Found REACHABLE: ${counts.REACHABLE}, MUTED: ${counts.MUTED}, SAFE: ${counts.SAFE}.`);
     pipelineFailed = true;
   }
@@ -176,7 +211,8 @@ function runResolverValidator() {
     errors: errorLog,
     warnings: warningLog,
     webpackGraphSize: compiledAssetGraph.size,
-    resolverFilesSize: resolverFiles.size
+    validatorSearchSpaceSize: validatorSearchSpace.size,
+    resolverRecordsSize: evaluatedFiles.size
   };
 
   fs.writeFileSync(
