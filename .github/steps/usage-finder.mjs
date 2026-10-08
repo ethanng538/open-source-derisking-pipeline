@@ -18,19 +18,15 @@ export function findTransitiveUsages(infectedFilesMap, completeFileGraph) {
     });
   });
 
-  // Trace references outward to consumer routes
   while (tracingQueue.length > 0) {
     const { currentPath, rootOrigin, packageRef, activeTaintedExportsInFile } = tracingQueue.shift();
 
-    // Scan every file in the compilation context to find who imports our current target
     completeFileGraph.forEach((graphData, consumerFilePath) => {
-      const consumerImportsMap = graphData.localImports; // dependencies -> [specifiers]
+      const consumerImportsMap = graphData.localImports;
 
       if (consumerImportsMap && consumerImportsMap[currentPath]) {
         const importedSpecifiers = consumerImportsMap[currentPath];
 
-        // ISOLATION CRITERIA: Check if consumer uses any of the tainted exports
-        // If a file imports a wild-card, or the dependency root is ambiguous, mark it as infected.
         const matchesVulnerabilityTaint = importedSpecifiers.some(specifier =>
           activeTaintedExportsInFile.has(specifier) || activeTaintedExportsInFile.has('*')
         );
@@ -47,7 +43,6 @@ export function findTransitiveUsages(infectedFilesMap, completeFileGraph) {
             traceChain: inheritedChain
           });
 
-          // Enqueue consumer to trace items importing it further downstream
           tracingQueue.push({
             currentPath: consumerFilePath,
             rootOrigin,

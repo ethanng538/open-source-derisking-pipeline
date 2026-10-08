@@ -68,10 +68,10 @@ jobs:
           echo "✅ Telemetry graph verified successfully."
 
       - name: Execute npm audit
-        run: npm audit --json workspace=@evershop/evershop > npm-audit.json || true
+        run: npm audit --json > npm-audit.json || true
 
       - name: Find vulnerable dependency files
-        run: node .github/security-utils/dependency-vulnerability-finder.mjs
+        run: node .github/steps/dependency-vulnerability-finder.mjs
 
       - name: Archive telemetry artefacts & validator diagnostics
         if: always()

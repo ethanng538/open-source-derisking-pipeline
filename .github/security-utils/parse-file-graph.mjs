@@ -1,16 +1,10 @@
+import _traverse from '@babel/traverse';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as parser from '@babel/parser';
-import _traverse from '@babel/traverse';
+import { cleanQueryAndLoaders } from './path-utils.mjs';
 
 const traverse = _traverse.default || _traverse;
-
-function cleanQueryAndLoaders(rawString) {
-  if (typeof rawString !== 'string' || !rawString) return '';
-  let target = rawString.split('?')[0];
-  if (target.includes('!')) { target = target.split('!').pop(); }
-  return target.trim();
-}
 
 function getBasePackage(cleanImportString) {
   if (!cleanImportString) return null;
@@ -18,7 +12,7 @@ function getBasePackage(cleanImportString) {
   return cleanImportString.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 }
 
-function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
+export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
   const localImportsMap = new Map();
   const taintedExports = new Set();  // Exported names that touch the vulnerability
   const packageUsages = new Set();   // External packages actively used in this file
@@ -114,13 +108,11 @@ function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
         if (importedBindings.has(name)) {
           const bindingInfo = importedBindings.get(name);
 
-          // Verify if the identifier is being referenced inside executable logic blocks
           if (bindingInfo.type === 'package' && vulnerablePackagesSet.has(bindingInfo.source)) {
-            if (idPath.isReferencedIdentifier()) {
+            if (idPath.isReferencedIdentifier() || (idPath.parent && idPath.parent.type === 'MemberExpression' && idPath.parent.object === idPath.node)) {
               packageUsages.add(bindingInfo.source);
               activeTaintedLocalBindings.add(name);
 
-              // Walk up the AST scopes to map which component variable contains this reference execution
               let parentFunc = idPath.findParent(p => p.isFunctionDeclaration() || p.isVariableDeclarator() || p.isClassDeclaration());
               if (parentFunc) {
                 let componentName = null;
@@ -137,7 +129,7 @@ function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
         }
       },
 
-      // Map exactly which exports expose our active tainted components
+      // Maps exactly which exports expose tainted components
       ExportNamedDeclaration(exportPath) {
         if (exportPath.node.declaration) {
           const decl = exportPath.node.declaration;
@@ -167,13 +159,11 @@ function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
         } else if (decl.type === 'FunctionDeclaration' && decl.id && activeTaintedLocalBindings.has(decl.id.name)) {
           taintedExports.add('default');
         } else if (exportPath.isReferenced()) {
-          // If default export is an anonymous declaration executing inline code logic
           taintedExports.add('default');
         }
       }
     });
 
-    // Populate the clean forward links map tracking what components are extracted from local files
     importedBindings.forEach((binding, localName) => {
       if (binding.type === 'local') {
         if (!localImportsMap.has(binding.source)) {
@@ -187,7 +177,6 @@ function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
     isAmbiguous = true;
   }
 
-  // Convert sets to standard structural objects
   const structuredLocalImports = {};
   localImportsMap.forEach((specifiers, filePathKey) => {
     structuredLocalImports[filePathKey] = Array.from(specifiers);
@@ -199,32 +188,4 @@ function parseFileSymbolGraph(filePath, codeText, vulnerablePackagesSet) {
     taintedExports: Array.from(taintedExports),
     localImports: structuredLocalImports
   };
-}
-
-export function findDirectUsages(appFiles, vulnerablePackagesSet) {
-  const infectedFilesMap = new Map();
-  const completeFileGraph = new Map();
-
-  appFiles.forEach(file => {
-    const code = fs.readFileSync(file, 'utf8');
-    const relativeFile = path.normalize(path.relative(process.cwd(), file));
-    const metadata = parseFileSymbolGraph(file, code, vulnerablePackagesSet);
-
-    completeFileGraph.set(relativeFile, {
-      localImports: metadata.localImports,
-      taintedExports: metadata.taintedExports
-    });
-
-    if (metadata.isAmbiguous) {
-      infectedFilesMap.set(relativeFile, { reason: 'AMBIGUOUS_SYNTAX', taintedExports: ['*'] });
-    } else if (metadata.packageUsages.length > 0) {
-      infectedFilesMap.set(relativeFile, {
-        reason: 'DIRECT_USAGE',
-        package: metadata.packageUsages[0],
-        taintedExports: metadata.taintedExports
-      });
-    }
-  });
-
-  return { infectedFilesMap, completeFileGraph };
 }
