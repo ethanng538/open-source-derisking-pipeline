@@ -21,16 +21,21 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
   let isAmbiguous = false;
 
   try {
-    const ast = parser.parse(codeText, {
+    /** @type {import('@babel/parser').ParserOptions} */
+    const options = {
       sourceType: 'module',
       plugins: ['jsx', 'typescript', 'decorators-legacy', 'classProperties'],
       allowAwaitOutsideFunction: true,
       allowReturnOutsideFunction: true
-    });
+    };
+
+    const ast = parser.parse(codeText, options);
 
     const importedBindings = new Map();
 
     traverse(ast, {
+      noScope: true,
+
       ImportDeclaration(fileImportPath) {
         const rawSource = fileImportPath.node.source.value;
         const cleanSource = cleanQueryAndLoaders(rawSource);
@@ -101,6 +106,8 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
     const activeTaintedLocalBindings = new Set();
 
     traverse(ast, {
+      noScope: true,
+
       Identifier(idPath) {
         const name = idPath.node.name;
         if (importedBindings.has(name)) {
