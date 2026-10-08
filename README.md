@@ -14,8 +14,8 @@ reachability analysis to CVE data provides me a verified baseline and directly a
 such as high numbers of false positives.
 
 ### Role in the Security Ecosystem
-Functioning as a build-time security gate, its role is to enforce that no structural risks introduced
-by external modules make it to deployment.
+Functioning as a build-time security guardrail, its role is to enforce that no structural risks introduced
+by external modules remains hidden before deployment.
 
 Reachability analysis domains such as dynamic reachability will not be incorporated given that it cannot be
 optimally resolved inside a CI pipeline. This maintains an acceptable build time during development and merges while

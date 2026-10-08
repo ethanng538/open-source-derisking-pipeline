@@ -8,57 +8,27 @@ to designing my security pipeline, key design considerations and core implementa
 ## 📍 Phase 1: Thinking About the Result
 
 ### The Objective
-An analysis engine cannot safely grade its own homework, meaning there must exist a separate process that evaluates the
-accuracy of any reachability results. Moreover, EverShop uses a unique architecture that orchestrates its own
-compilation loops behind the scenes, increasing the likelihood of data mapping errors in any implementation.
-
 Static analysis cannot resolve whether a file is actually reachable, only whether it contains evidence of exposure
-should the file, or linked files, be executed.
+should the file, or linked files, be executed. The evaluation of a vulnerability should not just be whether it is executed either: a vulnerability that may be
+unreachable at present may become active the moment a new execution path touches the file.
 
-### The Invariant Matrix
-When considering the output of a reachability analysis in the context of third-party dependencies, a file would receive
-one of the following states:
--   `REACHABLE`: The file references an external module that introduces an accessible and exploitable
-    vulnerability.
--   `MUTED`: The file references an external module that contains a vulnerability but the flaw cannot be accessed or
-    exploited.
+However, this does not mean you cannot extract more meaningful information besides the presence of a
+potential vulnerability. The EverShop framework uses Webpack as part of its hybrid compilation process, meaning I can
+use telemetry from Webpack to guarantee whether a certain subset of frontend and backend files are bundled.
+
+### The Potential States
+When considering the outcome of any analysis in our scope, a file would be in one of the following states:
+-   `BUNDLED`: The file references an external module with active CVEs and the file is bundled during the build process.
+-   `LIABLE`: The file references, directly or indirectly, an external module with active CVEs.
 -   `AMBIGUOUS:` The file references an external module whose source is ambiguous.
--   `SAFE`: The file does not reference external modules with active CVEs.
+-   `SAFE`: The file does not reference, directly or indirectly, external modules with active CVEs.
 
-To address the risks associated with EverShop's architecture as well as ensuring any implementation is producing
-accurate results, I designed a safety net that is built on the following principles:
-
--   **Inclusion:** If a file is flagged as `REACHABLE`, it must be a file that was compiled.
--   **Completeness:** Every source file flagged as potentially containing a vulnerability and bundled by the compiler
-    must have an explicit evaluation state.
--   **Causality:** If it is known the project uses a third-party dependency that contains a vulnerability, there
-    must be non-zero `REACHABLE` or `MUTED` records flagged by the engine.
-
-### Architectural Execution
-Given EverShop's ["Modular Monolith" architecture](https://evershop.io/docs/development/knowledge-base/architecture-overview "EverShop Architecture Overview"),
-there is no easy directory split between frontend and backend files. Client-side views and server-side logic are
-encapsulated together inside the directories.
-
-We must accurately handle these two worlds because they execute under entirely different processes:
--   **The Frontend Reality:** Client-side files go through compiler optimisation. If a frontend dependency isn't
-    explicitly imported, the compiler completely strips it out (tree-shaking). Code not part of the tree physically
-    cannot execute.
--   **The Backend Reality:** Server-side scripts run natively on the host. They are often triggered dynamically by
-    incoming network routes or internal events rather than direct import statements. A backend vulnerability can be
-    actively exposed and executable even if it appears completely detached from the main import tree.
-
-To address these considerations, telemetry hooks were non-intrusively placed within EverShop's compilation loops, using
-the compiler's own metadata to explicitly map web and node infrastructure:
--   **Search space definition:** Using compiler telemetry, it can be definitively determined whether a file was
-    compiled.
--   **Environment-agnostic routing:** By validating files based on what the compilers actually did with them, the
-    validator gracefully handles mixed, full-stack directories.
+This enables any team see which vulnerabilities in EverShop's core modules that are definitely bundled, increasing
+visibility on the attack surface before intensive development begins. 
 
 ## 📍 Phase 2: Finding Potential Vulnerabilities
 
 ### Leveraging AST analysis
-AST tools deterministically know the meanings of code statements.
-
 Unused imports are pruned at this stage.
 
 ### Producing the Initial Search Space

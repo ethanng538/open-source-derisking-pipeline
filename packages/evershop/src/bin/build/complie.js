@@ -73,7 +73,7 @@ function runOne(config) {
 
           rawWarnings.forEach(warn => {
             if (warn.message && warn.message.includes('Critical dependency: the request of a dependency is an expression')) {
-              let ambiguousFileOrigin = "Unknown Origin Context";
+              let ambiguousFileOrigin = "Unknown origin context";
 
               if (warn.module && warn.module.resource) {
                 ambiguousFileOrigin = path.normalize(path.relative(process.cwd(), warn.module.resource));
