@@ -1,9 +1,9 @@
-export function findTransitiveUsages(infectedFilesMap, completeFileGraph) {
-  const completeTracePayload = new Map();
+export function findIndirectUsages(infectedFilesMap, completeFileGraph) {
+  const tracePayload = new Map();
   const tracingQueue = [];
 
   infectedFilesMap.forEach((meta, filePath) => {
-    completeTracePayload.set(filePath, {
+    tracePayload.set(filePath, {
       status: meta.reason,
       ...(meta.package ? { package: meta.package } : {}),
       taintedExports: meta.taintedExports,
@@ -31,12 +31,12 @@ export function findTransitiveUsages(infectedFilesMap, completeFileGraph) {
           activeTaintedExportsInFile.has(specifier) || activeTaintedExportsInFile.has('*')
         );
 
-        if (matchesVulnerabilityTaint && !completeTracePayload.has(consumerFilePath)) {
-          const inheritedChain = [...completeTracePayload.get(currentPath).traceChain, consumerFilePath];
+        if (matchesVulnerabilityTaint && !tracePayload.has(consumerFilePath)) {
+          const inheritedChain = [...tracePayload.get(currentPath).traceChain, consumerFilePath];
 
           // The consumer file inherits vulnerability exposure only because it touched an infected component name
-          completeTracePayload.set(consumerFilePath, {
-            status: 'TRANSITIVE_USAGE',
+          tracePayload.set(consumerFilePath, {
+            status: 'INDIRECT_USAGE',
             viaOriginFile: rootOrigin,
             ...(packageRef ? { package: packageRef } : {}),
             impactedBySymbols: importedSpecifiers.filter(s => activeTaintedExportsInFile.has(s)),
@@ -54,5 +54,5 @@ export function findTransitiveUsages(infectedFilesMap, completeFileGraph) {
     });
   }
 
-  return completeTracePayload;
+  return tracePayload;
 }

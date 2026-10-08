@@ -2,6 +2,7 @@ import _traverse from '@babel/traverse';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as parser from '@babel/parser';
+
 import { cleanQueryAndLoaders } from './path-utils.mjs';
 
 const traverse = _traverse.default || _traverse;
@@ -11,6 +12,7 @@ function getBasePackage(cleanImportString) {
   const parts = cleanImportString.split('/');
   return cleanImportString.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 }
+
 
 export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
   const localImportsMap = new Map();
@@ -33,11 +35,9 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
         const rawSource = fileImportPath.node.source.value;
         const cleanSource = cleanQueryAndLoaders(rawSource);
 
-        if (cleanSource.startsWith('@components') || cleanSource.startsWith('@evershop')) {
-          return; // Ignore monorepos path aliases for this lookup pass
-        }
-
+        const isAlias = cleanSource.startsWith('@components') || cleanSource.startsWith('@evershop');
         const isLocal = cleanSource.startsWith('.');
+
         let resolvedTarget = cleanSource;
 
         if (isLocal) {
@@ -53,7 +53,7 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
             }
           }
           if (!resolvedTarget) return;
-        } else {
+        } else if (!isAlias) {
           resolvedTarget = getBasePackage(cleanSource);
         }
 
@@ -69,7 +69,6 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
         });
       },
 
-      // 2. Trace Dynamic Imports and CommonJS Requires
       CallExpression(fileImportPath) {
         if (fileImportPath.node.callee.name === 'require') {
           const arg = fileImportPath.node.arguments[0];
@@ -99,7 +98,6 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
       }
     });
 
-    // Step B: Determine real variable usage & trace Component execution pipelines
     const activeTaintedLocalBindings = new Set();
 
     traverse(ast, {

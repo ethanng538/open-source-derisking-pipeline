@@ -130,9 +130,7 @@ export async function compile(routes) {
   const finalGraph = {
     frontend: Array.from(new Set(clientResult.compiledModules)),
     backend: Array.from(new Set(serverResult.compiledModules)),
-    appSource: Array.from(allBundledPaths).map(p => {
-      return p.replace(/\/dist\//, '/src/');
-    }).filter(p =>
+    appSource: Array.from(allBundledPaths).filter(p =>
       p.includes(path.join('packages', 'evershop', 'src')) ||
       p.includes(path.join('extensions'))
     ),

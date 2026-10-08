@@ -21,7 +21,6 @@ When considering the outcome of any analysis in our scope, a file would be in on
 -   `BUNDLED`: The file references an external module with active CVEs and the file is bundled during the build process.
 -   `LIABLE`: The file references, directly or indirectly, an external module with active CVEs.
 -   `AMBIGUOUS:` The file references an external module whose source is ambiguous.
--   `SAFE`: The file does not reference, directly or indirectly, external modules with active CVEs.
 
 This enables any team see which vulnerabilities in EverShop's core modules that are definitely bundled, increasing
 visibility on the attack surface before intensive development begins. 

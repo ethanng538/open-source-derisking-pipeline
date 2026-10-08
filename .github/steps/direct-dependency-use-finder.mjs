@@ -18,7 +18,7 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
     });
 
     if (metadata.isAmbiguous) {
-      infectedFilesMap.set(relativeFile, { reason: 'AMBIGUOUS_SYNTAX', taintedExports: ['*'] });
+      infectedFilesMap.set(relativeFile, { reason: 'AMBIGUOUS', taintedExports: ['UNKNOWN'] });
     } else if (metadata.packageUsages.length > 0) {
       infectedFilesMap.set(relativeFile, {
         reason: 'DIRECT_USAGE',

@@ -70,10 +70,15 @@ jobs:
       - name: Execute npm audit
         run: npm audit --json > npm-audit.json || true
 
-      - name: Find vulnerable dependency files
+      - name: Find dependency vulnerabilities
         run: node .github/steps/dependency-vulnerability-finder.mjs
 
-      - name: Archive telemetry artefacts & validator diagnostics
+      - name: Evaluate dependency vulnerabilities
+        env:
+          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
+        run: node .github/steps/dependency-vulnerability-evaluator.mjs
+
+      - name: Archive pipeline artefacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -83,3 +88,4 @@ jobs:
             ${{ github.workspace }}/compilation-graph.json
             ${{ github.workspace }}/npm-audit.json
             ${{ github.workspace }}/dependency-vulnerabilities.json
+            ${{ github.workspace }}/evaluator-results.json
