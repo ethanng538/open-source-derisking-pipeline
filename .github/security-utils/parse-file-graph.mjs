@@ -154,9 +154,9 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
         const decl = exportPath.node.declaration;
         if (decl.type === 'Identifier' && activeTaintedLocalBindings.has(decl.name)) {
           taintedExports.add('default');
-        } else if (decl.type === 'FunctionDeclaration' && decl.id && decl.id.name && activeTaintedLocalBindings.has(decl.id.name)) {
+        } else if (decl.type === 'FunctionDeclaration' && decl.id && activeTaintedLocalBindings.has(decl.id.name)) {
           taintedExports.add('default');
-        } else if (exportPath.isReferenced && exportPath.isReferenced()) {
+        } else if (exportPath.isReferenced()) {
           taintedExports.add('default');
         }
       }
@@ -172,6 +172,7 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
     });
 
   } catch (err) {
+    console.error(`[Parser error in ${filePath}]:`, err);
     isAmbiguous = true;
   }
 
