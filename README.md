@@ -2,8 +2,8 @@
 
 > ### 📢 The Architectural Strategy
 > This repository documents a self-directed architectural deep dive into reachability-driven vulnerability detection.
-> The core focus centres on the identification of confirmed risk, de-risking the adoption of open-source code and
-> flagging structural risks during development.
+> The core focus centres on the identification of confirmed vulnerabilities, de-risking the adoption of open-source code
+> and flagging structural risks during development.
 
 ## 🔬 The Scope
 My pipeline will operate purely within CI, using static analysis to map out a system's potential vulnerabilities
@@ -29,7 +29,7 @@ My projects forks the [EverShop](https://github.com/evershopcommerce/evershop) r
 The EverShop framework provides core modules to help anyone create a highly customisable e-commerce platform and serves
 as a realistic benchmark to evaluate the effectiveness of my pipeline.
 
-The structure of my pipeline is as follows:
+### Pipeline structure
 ```text
 [ 1. EXTRACT MANIFEST VULNERABILITIES ]
 A list of vulnerable packages are extracted from the project's third-party dependencies.
