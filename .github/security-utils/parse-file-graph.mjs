@@ -74,7 +74,7 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
           const arg = fileImportPath.node.arguments[0];
           if (arg && arg.type === 'StringLiteral') {
             const cleanSource = cleanQueryAndLoaders(arg.value);
-            if (cleanSource.startsWith('.')) return; // Simple CJS local path bypass
+            if (cleanSource.startsWith('.')) return;
 
             const basePkg = getBasePackage(cleanSource);
             const parentDecl = fileImportPath.findParent(p => p.isVariableDeclarator());
@@ -154,9 +154,9 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
         const decl = exportPath.node.declaration;
         if (decl.type === 'Identifier' && activeTaintedLocalBindings.has(decl.name)) {
           taintedExports.add('default');
-        } else if (decl.type === 'FunctionDeclaration' && decl.id && activeTaintedLocalBindings.has(decl.id.name)) {
+        } else if (decl.type === 'FunctionDeclaration' && decl.id && decl.id.name && activeTaintedLocalBindings.has(decl.id.name)) {
           taintedExports.add('default');
-        } else if (exportPath.isReferenced()) {
+        } else if (exportPath.isReferenced && exportPath.isReferenced()) {
           taintedExports.add('default');
         }
       }
