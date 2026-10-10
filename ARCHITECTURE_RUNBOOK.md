@@ -42,16 +42,25 @@ compiled.
 
 ## 📍 Phase 2: Finding Potential Vulnerabilities
 
-import-and-invocation chain
+### The Objective
+Find vulnerable files, not just identify vulnerable packages, and produce a report that is high in precision and
+low in noise.
 
-- Checks if imports are actually used
-- Checks if the components or functions that use the vulnerable imports have actual usage
-- Actual usage means the file itself will be structurally included by EverShop or if another file that will be included
-  references the file using the vulnerability
+### Identifying Tainted Elements
+The vulnerable packages are identified by comparing the project's dependencies against a public vulnerability database.
+Application code is then scanned for direct usage of these vulnerable packages.
 
-### Leveraging AST analysis
-Unused imports are pruned at this stage.
+However, taint is established at the file level. Instead, abstract syntax tree (AST) analysis is used to taint only the
+components that invoke the vulnerable package(s).
 
-### Producing the Initial Search Space
+- Vulnerable packages are identified
+- Files that directly use these packages are identified
+- Import-and-invocation chains are discovered
+- This means if a file has, say, two exported components, but only one of those components use the vulnerable package,
+  only files that use the vulnerable package have indirect exposure
+
+### Tracing Taint
+
 
 ## Product Retrospective
+

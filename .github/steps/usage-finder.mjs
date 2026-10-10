@@ -1,13 +1,16 @@
-export function findIndirectUsages(infectedFilesMap, completeFileGraph) {
+export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
   const tracePayload = new Map();
   const tracingQueue = [];
 
-  infectedFilesMap.forEach((meta, filePath) => {
+  vulnerableFilesMap.forEach((meta, filePath) => {
+    const packagesArray = meta.package ? (Array.isArray(meta.package) ? meta.package : [meta.package]) : [];
+
     tracePayload.set(filePath, {
       status: meta.reason,
-      ...(meta.package ? { package: meta.package } : {}),
-      taintedExports: meta.taintedExports,
-      traceChain: [filePath]
+      viaOriginFiles: [],
+      package: packagesArray,
+      impactedBySymbols: [...meta.taintedExports],
+      traceChains: [[filePath]]
     });
 
     tracingQueue.push({
@@ -21,9 +24,10 @@ export function findIndirectUsages(infectedFilesMap, completeFileGraph) {
   while (tracingQueue.length > 0) {
     const { currentPath, rootOrigin, packageRef, activeTaintedExportsInFile } = tracingQueue.shift();
 
-    completeFileGraph.forEach((graphData, consumerFilePath) => {
+    fileGraph.forEach((graphData, consumerFilePath) => {
       const consumerImportsMap = graphData.localImports;
 
+      // Checks if the potential consumer file imports anything from the current vulnerable file
       if (consumerImportsMap && consumerImportsMap[currentPath]) {
         const importedSpecifiers = consumerImportsMap[currentPath];
 
@@ -31,24 +35,66 @@ export function findIndirectUsages(infectedFilesMap, completeFileGraph) {
           activeTaintedExportsInFile.has(specifier) || activeTaintedExportsInFile.has('*')
         );
 
-        if (matchesVulnerabilityTaint && !tracePayload.has(consumerFilePath)) {
-          const inheritedChain = [...tracePayload.get(currentPath).traceChain, consumerFilePath];
+        if (matchesVulnerabilityTaint) {
+          const existingRecord = tracePayload.get(consumerFilePath);
+          const currentTaintedSymbols = importedSpecifiers.filter(s => activeTaintedExportsInFile.has(s));
 
-          // The consumer file inherits vulnerability exposure only because it touched an infected component name
-          tracePayload.set(consumerFilePath, {
-            status: 'INDIRECT_USAGE',
-            viaOriginFile: rootOrigin,
-            ...(packageRef ? { package: packageRef } : {}),
-            impactedBySymbols: importedSpecifiers.filter(s => activeTaintedExportsInFile.has(s)),
-            traceChain: inheritedChain
-          });
+          const currentParentRecord = tracePayload.get(currentPath);
+          const primaryParentChain = currentParentRecord?.traceChains?.[0] || [currentPath];
+          const extendedChain = [...primaryParentChain, consumerFilePath];
 
-          tracingQueue.push({
-            currentPath: consumerFilePath,
-            rootOrigin,
-            packageRef,
-            activeTaintedExportsInFile: new Set(graphData.taintedExports)
-          });
+          // If it is the first time seeing this consumer file
+          if (!existingRecord) {
+            tracePayload.set(consumerFilePath, {
+              status: 'INDIRECT_USAGE',
+              viaOriginFiles: [rootOrigin],
+              package: packageRef ? [packageRef] : [],
+              impactedBySymbols: currentTaintedSymbols,
+              traceChains: [extendedChain]
+            });
+
+            tracingQueue.push({
+              currentPath: consumerFilePath,
+              rootOrigin,
+              packageRef,
+              activeTaintedExportsInFile: activeTaintedExportsInFile
+            });
+          } else {
+            // The file was already tainted by another vulnerability
+            let structureChanged = false;
+
+            // Merge unique origin files
+            if (rootOrigin && !existingRecord.viaOriginFiles.includes(rootOrigin)) {
+              existingRecord.viaOriginFiles.push(rootOrigin);
+              structureChanged = true;
+            }
+
+            // Merge unique packages
+            if (packageRef && !existingRecord.package.includes(packageRef)) {
+              existingRecord.package.push(packageRef);
+              structureChanged = true;
+            }
+
+            // Merge unique impacted symbols
+            currentTaintedSymbols.forEach(symbol => {
+              if (!existingRecord.impactedBySymbols.includes(symbol)) {
+                existingRecord.impactedBySymbols.push(symbol);
+                structureChanged = true;
+              }
+            });
+
+            // Appends the new alternative trail to the trace chains log
+            existingRecord.traceChains.push(extendedChain);
+
+            if (structureChanged) {
+              tracingQueue.push({
+                currentPath: consumerFilePath,
+                rootOrigin,
+                packageRef,
+                activeTaintedExportsInFile: activeTaintedExportsInFile
+              });
+            }
+          }
         }
       }
     });

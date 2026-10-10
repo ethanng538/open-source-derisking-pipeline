@@ -23,6 +23,9 @@ npm-debug.log
 coverage
 cypress
 .turbo
+*.cjs
+!tests/styleStub.cjs
+
 # Playwright artefacts
 test-results
 playwright-report

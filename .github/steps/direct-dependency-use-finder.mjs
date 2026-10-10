@@ -4,7 +4,7 @@ import path from 'node:path';
 import { parseFileGraph } from '../security-utils/parse-file-graph.mjs';
 
 export function findDirectUsages(appFiles, vulnerablePackagesSet) {
-  const infectedFilesMap = new Map();
+  const vulnerableFilesMap = new Map();
   const fileGraph = new Map();
 
   appFiles.forEach(file => {
@@ -18,9 +18,9 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
     });
 
     if (metadata.isAmbiguous) {
-      infectedFilesMap.set(relativeFile, { reason: 'AMBIGUOUS', taintedExports: ['UNKNOWN'] });
+      vulnerableFilesMap.set(relativeFile, { reason: 'AMBIGUOUS', taintedExports: ['UNKNOWN'] });
     } else if (metadata.packageUsages.length > 0) {
-      infectedFilesMap.set(relativeFile, {
+      vulnerableFilesMap.set(relativeFile, {
         reason: 'DIRECT_USAGE',
         package: metadata.packageUsages,
         taintedExports: metadata.taintedExports
@@ -28,5 +28,5 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
     }
   });
 
-  return { infectedFilesMap, fileGraph };
+  return { vulnerableFilesMap, fileGraph };
 }
