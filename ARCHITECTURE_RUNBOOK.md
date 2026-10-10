@@ -1,4 +1,4 @@
-# 📓 Reachability Pipeline Architecture Runbook
+# 📓 Architecture Runbook
 
 This document serves as the chronological engineering ledger for this project. It details key design considerations and
 core implementation details without all the loaded jargon.
@@ -35,9 +35,10 @@ The dependency graph enables files to receive human-readable classifications:
 -   `AMBIGUOUS:` The file references an external module whose source is ambiguous and needs human triage to determine
     the presence of a vulnerability.
 
-The EverShop framework provides many UI components and APIs that can be used when making an extension.
-These classifications provide the visibility to see pre-existing vulnerabilities while also flagging if the use of one
-of these assets results in a vulnerable file getting compiled.
+Changes in member size of each classification can then be used to provide insights on the risk profile of the project.
+For example, if the number of `LIABLE` files go down but there is an equal increase in number of `CONFIRMED` files,
+it indicates that a change had caused a certain number of vulnerable files, that were potentially unused, to being
+compiled.
 
 ## 📍 Phase 2: Finding Potential Vulnerabilities
 
@@ -52,7 +53,5 @@ import-and-invocation chain
 Unused imports are pruned at this stage.
 
 ### Producing the Initial Search Space
-
-## 📍 Phase 3: Pipeline Tests
 
 ## Product Retrospective
