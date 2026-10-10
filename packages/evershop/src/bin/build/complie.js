@@ -130,7 +130,9 @@ export async function compile(routes) {
   const finalGraph = {
     frontend: Array.from(new Set(clientResult.compiledModules)),
     backend: Array.from(new Set(serverResult.compiledModules)),
-    appSource: Array.from(allBundledPaths).filter(p =>
+    appSource: Array.from(allBundledPaths).map(p => {
+      return p.replace(/\/dist\//, '/src/');
+    }).filter(p =>
       p.includes(path.join('packages', 'evershop', 'src')) ||
       p.includes(path.join('extensions'))
     ),
@@ -140,9 +142,9 @@ export async function compile(routes) {
     ]))
   };
 
-  const targetOutput = process.env.COMPILATION_GRAPH_PATH
-    ? path.resolve(process.env.COMPILATION_GRAPH_PATH)
-    : path.join(process.cwd(), 'compilation-graph.json');
+  const targetOutput = process.env.DEPENDENCY_GRAPH_PATH
+    ? path.resolve(process.env.DEPENDENCY_GRAPH_PATH)
+    : path.join(process.cwd(), 'dependency-graph.json');
 
   const targetDir = path.dirname(targetOutput);
   if (!fs.existsSync(targetDir)) {

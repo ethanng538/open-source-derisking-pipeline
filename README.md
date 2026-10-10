@@ -1,25 +1,24 @@
-# Dependency Vulnerability Reachability Pipeline
+# Open-Source De-Risking Pipeline
 
 > ### 📢 The Architectural Strategy
-> This repository documents a self-directed architectural deep dive into reachability-driven vulnerability detection.
-> The core focus centres on the identification of confirmed vulnerabilities, de-risking the adoption of open-source code
-> and flagging structural risks during development.
+> This repository documents a self-directed architectural deep dive into how the adoption of an open-source framework
+> could be de-risked. The core focus centres on the identification of confirmed vulnerabilities, distinguishing
+> inherited and introduced technical debt, and flagging structural risks during development.
 
 ## 🔬 The Scope
-My pipeline will operate purely within CI, using static analysis to map out a system's potential vulnerabilities
-before evaluating whether they pose a confirmed risk.
+Functioning as a build-time security guardrail, my pipeline's role is to enforce that no structural risks introduced
+by external modules remain hidden before deployment.
 
-This pipeline is deliberately constrained to vulnerabilities originating from third-party dependencies. Grounding my
-reachability analysis to CVE data provides me a verified baseline and directly addresses weaknesses of static analysis
-such as high numbers of false positives.
+It is deliberately constrained to vulnerabilities originating from third-party dependencies. Grounding my analysis to
+CVE data provides me a verified baseline and directly addresses weaknesses of static analysis such as high numbers of
+false positives.
 
 ### Role in the Security Ecosystem
-Functioning as a build-time security guardrail, its role is to enforce that no structural risks introduced
-by external modules remains hidden before deployment.
+My pipeline will operate purely within CI, using static analysis to map out a system's potential vulnerabilities.
 
-Reachability analysis domains such as dynamic reachability will not be incorporated given that it cannot be
-optimally resolved inside a CI pipeline. This maintains an acceptable build time during development and merges while
-reducing design drift into evaluating dynamic, build-time traces.
+This includes the initial audit of the adopted framework as well as monitoring the development of new extensions.
+By evaluating both the framework's core modules and new additions at each commit, the pipelines become a ledger of
+exactly what security debt is being inherited and what risks are being introduced.
 
 ---
 
@@ -40,15 +39,15 @@ Abstract Syntax Tree (AST) analysis is used to collate all external references u
 application code.
               │
               ▼        
-[ 3. MAPPING TO VULNERABLE DEPENDENCIES ]
+[ 3. PARSE FILE GRAPH ]
+Indirect usages are identified at the component-use level.
+              │
+              ▼
+[ 4. MAP TO VULNERABLE DEPENDENCIES ]
 The external references found are mapped to the list of vulnerable packages.
               │
               ▼
-[ 4. REACHABILITY RESOLUTION ]
-The dependency vulnerability mappings are analysed for reachability.
-              │
-              ▼
-[ 5. SAFETY NET ENFORCEMENT ]
+[ 5. PIPELINE EVALUATION ]
 Strict compliance gates are used to verify the system's output,
 blocking the build if data contradictions or insufficient coverage is found.
 ```

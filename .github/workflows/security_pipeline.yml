@@ -32,25 +32,25 @@ jobs:
           mkdir -p config
           echo "module.exports = {};" > config/production.js
 
-      - name: Compile live codebase graph
+      - name: Extract webpack dependency graph
         env:
-          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
+          DEPENDENCY_GRAPH_PATH: ${{ github.workspace }}/dependency-graph.json
         run: |
           # Runs the native SWC transpiler pass to build localised file distributions
           npm run compile
           
-          # Runs the Webpack bundling pass which invokes inline telemetry hooks
+          # Runs the Webpack bundling pass which invokes telemetry hooks
           npm run build:stats
           
           echo "=== Verification check: validating telemetry schema ==="
-          if [ ! -f "${{ github.workspace }}/compilation-graph.json" ]; then
+          if [ ! -f "${{ github.workspace }}/dependency-graph.json" ]; then
             echo "::error::Telemetry file was never created."
             exit 1
           fi
           
           # Read tracking metrics out of the JSON
-          FRONTEND_COUNT=$(jq '.frontend | length' ${{ github.workspace }}/compilation-graph.json)
-          BACKEND_COUNT=$(jq '.backend | length' ${{ github.workspace }}/compilation-graph.json)
+          FRONTEND_COUNT=$(jq '.frontend | length' ${{ github.workspace }}/dependency-graph.json)
+          BACKEND_COUNT=$(jq '.backend | length' ${{ github.workspace }}/dependency-graph.json)
           
           echo ""
           echo "📊 Telemetry summary:"
@@ -61,7 +61,7 @@ jobs:
           if [ "$FRONTEND_COUNT" -eq 0 ] || [ "$BACKEND_COUNT" -eq 0 ]; then
             echo "::error::Telemetry generation failed. One or both graphs are completely empty."
             echo "=== Corrupted file snapshot ==="
-            cat ${{ github.workspace }}/compilation-graph.json
+            cat ${{ github.workspace }}/dependency-graph.json
             exit 1
           fi
           
@@ -70,12 +70,12 @@ jobs:
       - name: Execute npm audit
         run: npm audit --json > npm-audit.json || true
 
-      - name: Find dependency vulnerabilities
-        run: node .github/steps/dependency-vulnerability-finder.mjs
+      - name: Resolve dependency vulnerabilities
+        run: node .github/steps/dependency-vulnerability-resolver.mjs
 
       - name: Evaluate dependency vulnerabilities
         env:
-          COMPILATION_GRAPH_PATH: ${{ github.workspace }}/compilation-graph.json
+          DEPENDENCY_GRAPH_PATH: ${{ github.workspace }}/dependency-graph.json
         run: node .github/steps/dependency-vulnerability-evaluator.mjs
 
       - name: Archive pipeline artefacts
@@ -85,7 +85,7 @@ jobs:
           name: appsec-telemetry-diagnostics
           retention-days: 7
           path: |
-            ${{ github.workspace }}/compilation-graph.json
+            ${{ github.workspace }}/dependency-graph.json
             ${{ github.workspace }}/npm-audit.json
             ${{ github.workspace }}/dependency-vulnerabilities.json
             ${{ github.workspace }}/evaluator-results.json

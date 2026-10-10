@@ -21,15 +21,12 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
   let isAmbiguous = false;
 
   try {
-    /** @type {import('@babel/parser').ParserOptions} */
-    const options = {
+    const ast = parser.parse(codeText, {
       sourceType: 'module',
       plugins: ['jsx', 'typescript', 'decorators-legacy', 'classProperties'],
       allowAwaitOutsideFunction: true,
       allowReturnOutsideFunction: true
-    };
-
-    const ast = parser.parse(codeText, options);
+    });
 
     const importedBindings = new Map();
 
