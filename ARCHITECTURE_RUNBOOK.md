@@ -48,19 +48,29 @@ low in noise.
 
 ### Identifying Tainted Elements
 The vulnerable packages are identified by comparing the project's dependencies against a public vulnerability database.
-Application code is then scanned for direct usage of these vulnerable packages.
+Application code is then scanned for direct usage of these vulnerable packages. It is also this stage where files with
+ambiguous references are classified.
 
-However, taint is established at the file level. Instead, abstract syntax tree (AST) analysis is used to taint only the
-components that invoke the vulnerable package(s).
+To maintain precision, taint should only occur if a component has actual exposure to a vulnerable package. For example,
+a file that defines themed UI components may export two different product displays. Only one of these displays may
+actually use the vulnerable package.
 
-- Vulnerable packages are identified
-- Files that directly use these packages are identified
-- Import-and-invocation chains are discovered
-- This means if a file has, say, two exported components, but only one of those components use the vulnerable package,
-  only files that use the vulnerable package have indirect exposure
+By tracking taint at the component level rather than the file level, files and components without actual exposure are
+not falsely flagged.
 
 ### Tracing Taint
+To track indirect usages, all files are scanned to see if they reference a tainted component. If they do, taint is
+inherited into the consumer file.
 
+The chains of exposure are also recorded along with whether a file is indirectly exposed to multiple vulnerable
+import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
+independently carry taint, each chain of exposure is recorded along with the vulnerable packages from each chain.
 
 ## Product Retrospective
 
+It is a growing trends for teams and organisations to use open-source code to jump-start their development. My deep dive
+revealed how visibility can be used to manage risk and inform security decisions throughout development.
+
+What I took away was what could be gained by analysing the code provided by the framework. While not every open-source
+framework may have something that provides a dependency graph, it reinforced the importance of carefully considering
+the security scope and improved my ability to design bespoke security solutions.
