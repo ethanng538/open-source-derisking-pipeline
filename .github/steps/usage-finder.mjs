@@ -3,7 +3,9 @@ export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
   const tracingQueue = [];
 
   vulnerableFilesMap.forEach((meta, filePath) => {
-    const packagesArray = meta.package ? (Array.isArray(meta.package) ? meta.package : [meta.package]) : [];
+    const packagesArray =
+      meta.package ? (Array.isArray(meta.package) ?
+      meta.package.flat() : [meta.package]) : [];
 
     tracePayload.set(filePath, {
       status: meta.reason,
@@ -45,10 +47,12 @@ export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
 
           // If it is the first time seeing this consumer file
           if (!existingRecord) {
+            const incomingPackage = packageRef ? (Array.isArray(packageRef) ? packageRef.flat() : [packageRef]) : [];
+
             tracePayload.set(consumerFilePath, {
               status: 'INDIRECT_USAGE',
               viaOriginFiles: [rootOrigin],
-              package: packageRef ? [packageRef] : [],
+              package: incomingPackage,
               impactedBySymbols: currentTaintedSymbols,
               traceChains: [extendedChain]
             });
@@ -70,9 +74,15 @@ export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
             }
 
             // Merge unique packages
-            if (packageRef && !existingRecord.package.includes(packageRef)) {
-              existingRecord.package.push(packageRef);
-              structureChanged = true;
+            if (packageRef) {
+              const flatIncomingPackages = Array.isArray(packageRef) ? packageRef.flat() : [packageRef];
+
+              flatIncomingPackages.forEach(pkg => {
+                if (!existingRecord.package.includes(pkg)) {
+                  existingRecord.package.push(pkg);
+                  structureChanged = true;
+                }
+              });
             }
 
             // Merge unique impacted symbols
