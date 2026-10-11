@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as parser from '@babel/parser';
 
+import { stripExtension } from './path-utils.mjs'
 import { cleanQueryAndLoaders } from './path-utils.mjs';
 
 const traverse = _traverse.default || _traverse;
@@ -44,7 +45,8 @@ export function parseFileGraph(filePath, codeText, vulnerablePackagesSet) {
 
         if (isLocal) {
           const currentDir = path.dirname(filePath);
-          const absoluteTarget = path.resolve(currentDir, cleanSource);
+          const cleanExtensionlessSource = stripExtension(cleanSource);
+          const absoluteTarget = path.resolve(currentDir, cleanExtensionlessSource);
           const extensions = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.js'];
           resolvedTarget = null;
           for (const ext of extensions) {
