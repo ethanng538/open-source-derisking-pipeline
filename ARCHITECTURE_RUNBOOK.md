@@ -66,6 +66,8 @@ The chains of exposure are also recorded along with whether a file is indirectly
 import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
 independently carry taint, each chain of exposure is recorded along with the vulnerable packages from each chain.
 
+https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55
+
 ## Product Retrospective
 
 It is a growing trends for teams and organisations to use open-source code to jump-start their development. My deep dive

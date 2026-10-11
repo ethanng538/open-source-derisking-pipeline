@@ -10,7 +10,7 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
   appFiles.forEach(file => {
     const code = fs.readFileSync(file, 'utf8');
     const relativeFile = path.normalize(path.relative(process.cwd(), file));
-    const metadata = parseFileGraph(file, code, vulnerablePackagesSet);
+    const metadata = parseFileGraph(relativeFile, code, vulnerablePackagesSet);
 
     fileGraph.set(relativeFile, {
       localImports: metadata.localImports,
