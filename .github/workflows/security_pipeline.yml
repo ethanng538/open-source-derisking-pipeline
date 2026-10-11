@@ -1,4 +1,4 @@
-name: AppSec Reachability Pipeline
+name: Dependency vulnerability pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  reachability-pipeline:
+  dependency-vulnerability-pipeline:
     runs-on: ubuntu-latest
 
     steps:

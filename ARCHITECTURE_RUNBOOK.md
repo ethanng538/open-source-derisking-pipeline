@@ -48,8 +48,8 @@ low in noise.
 
 ### Identifying Tainted Elements
 The vulnerable packages are identified by comparing the project's dependencies against a public vulnerability database.
-Application code is then scanned for direct usage of these vulnerable packages. It is also this stage where files with
-ambiguous references are classified.
+Application code is then scanned for direct usage of these vulnerable packages. Files with ambiguous references, that is
+files where it is unknown whether it is referencing a vulnerable package, are classified as ambiguous at this stage.
 
 To maintain precision, taint should only occur if a component has actual exposure to a vulnerable package. For example,
 a file that defines themed UI components may export two different product displays. Only one of these displays may
