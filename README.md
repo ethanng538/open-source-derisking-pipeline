@@ -58,4 +58,4 @@ Dependency vulnerabilities are classified, with the growth of these classificati
 providing visibility on the project's security debt and where they originate from.
 ```
 
-👉 **To view my design decisions in-depth, view the** [Reachability Pipeline Architecture Runbook](./ARCHITECTURE_RUNBOOK.md).
+👉 **To view my design decisions in-depth, view the** [Reachability Pipeline Architecture Runbook](docs/ARCHITECTURE_RUNBOOK.md).

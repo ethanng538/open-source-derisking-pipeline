@@ -1,6 +1,5 @@
 import React from 'react';
 
-// @ts-ignore
 import { parseBuffer } from 'music-metadata';
 
 export interface SafeTestInstanceInterface {
