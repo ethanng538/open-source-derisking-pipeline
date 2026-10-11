@@ -88,5 +88,6 @@ jobs:
           path: |
             ${{ github.workspace }}/dependency-graph.json
             ${{ github.workspace }}/npm-audit.json
+            ${{ github.workspace }}/taint-relationships-map.json
             ${{ github.workspace }}/dependency-vulnerabilities.json
             ${{ github.workspace }}/evaluator-results.json
