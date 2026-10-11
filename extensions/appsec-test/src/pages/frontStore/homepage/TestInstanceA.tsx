@@ -1,10 +1,14 @@
 import React from 'react';
 
 // @ts-ignore
-import { OpenUrlApi } from '@a2ui/web_core';
+import { openUrl } from '@a2ui/web_core';
+
+export interface SafeTestInstanceInterface {
+  val: string;
+}
 
 export default function TestInstanceA() {
-  const dependencyTrace = typeof OpenUrlApi;
+  const dependencyTrace = typeof openUrl;
 
   return (
     <div className="test-instance-a" data-trace={dependencyTrace}>
