@@ -26,9 +26,6 @@ cypress
 *.cjs
 !tests/styleStub.cjs
 
-**/TestInstanceB*
-**/TestInstanceC*
-
 # Playwright artefacts
 test-results
 playwright-report
