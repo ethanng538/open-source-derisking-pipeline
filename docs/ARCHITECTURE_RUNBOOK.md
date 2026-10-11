@@ -68,6 +68,8 @@ independently carry taint, each chain of exposure is recorded along with the vul
 
 https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55
 
+https://osv.dev/vulnerability/GHSA-6688-9rhm-gjv2
+
 ## Product Retrospective
 
 It is a growing trends for teams and organisations to use open-source code to jump-start their development. My deep dive
