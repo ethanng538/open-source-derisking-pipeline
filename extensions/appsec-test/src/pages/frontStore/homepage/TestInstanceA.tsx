@@ -1,14 +1,14 @@
 import React from 'react';
 
 // @ts-ignore
-import { openUrl } from '@a2ui/web_core';
+import { parseBuffer } from 'music-metadata';
 
 export interface SafeTestInstanceInterface {
   val: string;
 }
 
 export default function TestInstanceA() {
-  const dependencyTrace = typeof openUrl;
+  const dependencyTrace = typeof parseBuffer;
 
   return (
     <div className="test-instance-a" data-trace={dependencyTrace}>
