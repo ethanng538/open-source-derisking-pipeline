@@ -66,7 +66,56 @@ The chains of exposure are also recorded along with whether a file is indirectly
 import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
 independently carry taint, each chain of exposure is recorded along with the vulnerable packages from each chain.
 
-https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55
+## 📍 Phase 3: Validating Taint Chains
+
+The result below shows the pipeline result on the base fork:
+![Base evaluation](images/base-evaluation.png)
+
+The tests below demonstrate how the ledger automatically updates should vulnerabilities be introduced during development
+and how the evaluation results precisely traces the chain of taint.
+
+<details>
+<summary><b>1. Single vulnerability test</b></summary>
+
+**Test**: Test instance A is placed in the app's home page. Instance A imports [vulnerability A](https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55)
+and exports a non-vulnerable interface and a separate component that uses the vulnerable dependency.
+
+**Result**: The vulnerable dependency is successfully identified and instance A is correctly classified as
+`CONFIRMED`.
+
+![Test 1 evaluation](images/test1-evaluation.png)
+![Test instance A in the evaluator results](images/instance-a-record.png)
+
+</details>
+
+<details>
+<summary><b>2. Indirect use test</b></summary>
+
+**Test**: Test instances B and C are placed in the app's home page. Instance B uses instance A's tainted component
+whereas instance C only uses the safe interface.
+
+**Result**: The number of vulnerable packages correctly remain the same and instance B is correctly classified as
+`CONFIRMED`.
+
+![Test 2 evaluation](images/test2-evaluation.png)
+![Test instance B in the evaluator results with instance C excluded](images/instance-b-record.png)
+
+</details>
+
+<details>
+<summary><b>3. Transitive use and dual chain test</b></summary>
+
+**Test**: Test instances D and E are placed in the app's home page. Instance D imports [vulnerability B](https://osv.dev/vulnerability/GHSA-6688-9rhm-gjv2)
+and exports a component that uses the vulnerable dependency. Instance E uses both instance B's tainted component and
+instance D's tainted component.
+
+**Result**: The number of vulnerable packages correctly remain the same, both instances D and E are correctly classified
+as `CONFIRMED` and instance E correctly shows both vulnerable dependencies and both chains of tainted usage.
+
+![Test 3 evaluation](images/test3-evaluation.png)
+![Test E showsing both taint chains](images/instance-e-record.png)
+
+</details>
 
 ## Product Retrospective
 
