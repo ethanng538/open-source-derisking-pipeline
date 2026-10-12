@@ -35,7 +35,6 @@ playwright/.cache
 .prettierignore
 .prettierrc
 mysqlToPostgres.js
-/docs
 /specifications
 /wiki
 /design-kit

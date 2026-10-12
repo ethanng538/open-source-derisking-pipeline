@@ -7,6 +7,8 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
   const vulnerableFilesMap = new Map();
   const fileGraph = new Map();
 
+  const debugPayload = {};
+
   appFiles.forEach(file => {
     const code = fs.readFileSync(file, 'utf8');
     const relativeFile = path.normalize(path.relative(process.cwd(), file));
@@ -16,6 +18,12 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
       localImports: metadata.localImports,
       taintedExports: metadata.taintedExports
     });
+
+    debugPayload[relativeFile] = {
+      isDirectlyVulnerable: metadata.packageUsages.length > 0,
+      taintedExports: metadata.taintedExports,
+      localImports: metadata.localImports
+    };
 
     if (metadata.isAmbiguous) {
       vulnerableFilesMap.set(relativeFile, { reason: 'AMBIGUOUS', taintedExports: ['UNKNOWN'] });
@@ -27,6 +35,12 @@ export function findDirectUsages(appFiles, vulnerablePackagesSet) {
       });
     }
   });
+
+  fs.writeFileSync(
+    'taint-relationships-map.json',
+    JSON.stringify(debugPayload, null, 2),
+    'utf8'
+  );
 
   return { vulnerableFilesMap, fileGraph };
 }

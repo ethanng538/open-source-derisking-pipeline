@@ -1,4 +1,4 @@
-name: AppSec Reachability Pipeline
+name: Dependency vulnerability pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  reachability-pipeline:
+  dependency-vulnerability-pipeline:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,9 +20,9 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-#      - name: Inject vulnerable dependency
-#        run: |
-#          npm install @a2ui/web_core@0.9.0 --save-dev --workspace=@evershop/appsec-test --package-lock-only
+      - name: Inject vulnerable dependency
+        run: |
+          npm install music-metadata@11.15.0 dompurify@3.4.15 --save-dev --workspace=@evershop/appsec-test
 
       - name: Install codebase dependencies
         run: npm ci
@@ -42,6 +42,7 @@ jobs:
           # Runs the Webpack bundling pass which invokes telemetry hooks
           npm run build:stats
           
+          echo ""
           echo "=== Verification check: validating telemetry schema ==="
           if [ ! -f "${{ github.workspace }}/dependency-graph.json" ]; then
             echo "::error::Telemetry file was never created."
@@ -87,5 +88,6 @@ jobs:
           path: |
             ${{ github.workspace }}/dependency-graph.json
             ${{ github.workspace }}/npm-audit.json
+            ${{ github.workspace }}/taint-relationships-map.json
             ${{ github.workspace }}/dependency-vulnerabilities.json
             ${{ github.workspace }}/evaluator-results.json
