@@ -32,10 +32,6 @@ COPY . .
 
 RUN npm install --include=dev --ignore-scripts
 
-RUN mkdir -p node_modules/@a2ui/web_core \
-  && echo 'export const OpenUrlApi = {};' > node_modules/@a2ui/web_core/index.js \
-  && echo '{"name": "@a2ui/web_core", "version": "0.9.0", "type": "module", "main": "index.js"}' > node_modules/@a2ui/web_core/package.json
-
 # Project directories that are not tracked in git but that the app expects to
 # exist: media/ for uploads, public/ for static files, themes/ and extensions/
 # for add-ons, config/ for node-config.
