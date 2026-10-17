@@ -20,9 +20,9 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Inject vulnerable dependency
-        run: |
-          npm install music-metadata@11.15.0 --save-dev --workspace=@evershop/appsec-test
+#      - name: Inject vulnerable dependency
+#        run: |
+#          npm install music-metadata@11.15.0 dompurify@3.4.15 --save-dev --workspace=@evershop/appsec-test
 
       - name: Install codebase dependencies
         run: npm ci
