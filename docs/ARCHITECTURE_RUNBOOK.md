@@ -66,6 +66,20 @@ The chains of exposure are also recorded along with whether a file is indirectly
 import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
 independently carry taint, each chain of exposure is recorded along with the vulnerable packages from each chain.
 
+## 📍 Phase 3: Validating Taint Chains
+
+The result below shows the pipeline result on the base fork:
+![Base evaluation](images/base-evaluation.png)
+
+The tests below demonstrate how the ledger automatically updates should vulnerabilities be introduced during development
+and how the evaluation results precisely traces the chain of taint.
+
+<details>
+<summary><b>1. Single vulnerability</b></summary>
+A test instance is placed in the app's homepage. The instance imports [vulnerability A](https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55)
+
+</details>
+
 https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55
 
 https://osv.dev/vulnerability/GHSA-6688-9rhm-gjv2
