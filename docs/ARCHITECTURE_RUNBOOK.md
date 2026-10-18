@@ -108,7 +108,7 @@ whereas instance C only uses the safe interface.
 </details>
 
 <details>
-<summary><b>3. Transitive use and dual chain test</b></summary>
+<summary><b>3. Transitive use and multiple chain test</b></summary>
 
 **Test**: Test instances D and E are placed in the app's home page. Instance D imports [vulnerability B](https://osv.dev/vulnerability/GHSA-6688-9rhm-gjv2)
 and exports a component that uses the vulnerable dependency. Instance E uses both instance B's tainted component and
@@ -122,11 +122,15 @@ as `CONFIRMED` and instance E correctly shows both vulnerable dependencies and b
 
 </details>
 
-## Product Retrospective
+## Project Retrospective
 
-It is a growing trend for teams and organisations to use open-source code to jump-start their development. My deep dive
-revealed how visibility can be used to manage risk and inform security decisions throughout development.
+It is a growing trend for teams and organisations to use open-source code to jump-start their development. However,
+it remains an ongoing challenge to review adopted code for structural flaws.
 
-What I took away was what could be gained by analysing the code provided by the framework. While not every open-source
-framework may have something that provides a dependency graph, it reinforced the importance of carefully considering
-the security scope and improved my ability to design bespoke security solutions.
+My deep drive revealed how targeted visibility can be used to effectively monitor known risks, forming a composable
+risk management strategy. Conducting an automated audit each time the codebase changes also builds a running ledger that
+tracks surges in vulnerability exposure.
+
+This project demonstrated the effectiveness of tailoring security solutions to the environment you are securing. While
+some of the tools I designed here won't fit into every application, it has reinforced my ability to produce focused
+guardrails that enable agile development while ensuring security is always part of the picture.
