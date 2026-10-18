@@ -3,6 +3,11 @@
 This document serves as the chronological engineering ledger for this project. It details key design considerations and
 core implementation details without all the loaded jargon.
 
+### Notes on wording
+The use of the word "component" in this runbook primarily refers to blocks of code that can be used by other files and
+do not exclusively refer to re-usable items in source code that reduce duplication in the traditional software
+development sense.
+
 ---
 
 ## 📍 Phase 1: Thinking About the Result
@@ -43,13 +48,13 @@ compiled.
 ## 📍 Phase 2: Finding Potential Vulnerabilities
 
 ### The Objective
-Find vulnerable files, not just identify vulnerable packages, and produce a report that is high in precision and
-low in noise.
+Achieve granular vulnerability mapping by identifying the components that ingest vulnerable dependencies and their
+'consumers', producing reports that are low in noise without making any assumptions about reachability.
 
 ### Identifying Tainted Elements
 The vulnerable packages are identified by comparing the project's dependencies against a public vulnerability database.
-Application code is then scanned for direct usage of these vulnerable packages. It is also this stage where files with
-ambiguous references are classified.
+Application code is then scanned for direct usage of these vulnerable packages. Files with ambiguous references, that is
+files where it is unknown whether it is referencing a vulnerable package, are classified as ambiguous at this stage.
 
 To maintain precision, taint should only occur if a component has actual exposure to a vulnerable package. For example,
 a file that defines themed UI components may export two different product displays. Only one of these displays may
@@ -60,17 +65,72 @@ not falsely flagged.
 
 ### Tracing Taint
 To track indirect usages, all files are scanned to see if they reference a tainted component. If they do, taint is
-inherited into the consumer file.
+inherited into the consumer file, tainting the consumer component.
 
 The chains of exposure are also recorded along with whether a file is indirectly exposed to multiple vulnerable
 import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
 independently carry taint, each chain of exposure is recorded along with the vulnerable packages from each chain.
 
-## Product Retrospective
+## 📍 Phase 3: Validating Taint Chains
 
-It is a growing trends for teams and organisations to use open-source code to jump-start their development. My deep dive
-revealed how visibility can be used to manage risk and inform security decisions throughout development.
+The result below shows the pipeline result on the base fork:
+![Base evaluation](images/base-evaluation.png)
 
-What I took away was what could be gained by analysing the code provided by the framework. While not every open-source
-framework may have something that provides a dependency graph, it reinforced the importance of carefully considering
-the security scope and improved my ability to design bespoke security solutions.
+The tests below demonstrate how the ledger automatically updates should vulnerabilities be introduced during development
+and how the evaluation results precisely traces the chain of taint.
+
+<details>
+<summary><b>1. Single vulnerability test</b></summary>
+
+**Test**: Test instance A is placed in the app's home page. Instance A imports [vulnerability A](https://osv.dev/vulnerability/GHSA-jjpr-9cvf-cq55)
+and exports a non-vulnerable interface and a separate component that uses the vulnerable dependency.
+
+**Result**: The vulnerable dependency is successfully identified and instance A is correctly classified as
+`CONFIRMED`.
+
+![Test 1 evaluation](images/test1-evaluation.png)
+![Test instance A in the evaluator results](images/instance-a-record.png)
+
+</details>
+
+<details>
+<summary><b>2. Indirect use test</b></summary>
+
+**Test**: Test instances B and C are placed in the app's home page. Instance B uses instance A's tainted component
+whereas instance C only uses the safe interface.
+
+**Result**: The number of vulnerable packages correctly remain the same and instance B is correctly classified as
+`CONFIRMED`.
+
+![Test 2 evaluation](images/test2-evaluation.png)
+![Test instance B in the evaluator results with instance C excluded](images/instance-b-record.png)
+
+</details>
+
+<details>
+<summary><b>3. Transitive use and multiple chain test</b></summary>
+
+**Test**: Test instances D and E are placed in the app's home page. Instance D imports [vulnerability B](https://osv.dev/vulnerability/GHSA-6688-9rhm-gjv2)
+and exports a component that uses the vulnerable dependency. Instance E uses both instance B's tainted component and
+instance D's tainted component.
+
+**Result**: The number of vulnerable packages correctly remain the same, both instances D and E are correctly classified
+as `CONFIRMED` and instance E correctly shows both vulnerable dependencies and both chains of tainted usage.
+
+![Test 3 evaluation](images/test3-evaluation.png)
+![Test E showsing both taint chains](images/instance-e-record.png)
+
+</details>
+
+## Project Retrospective
+
+It is a growing trend for teams and organisations to use open-source code to jump-start their development. However,
+it remains an ongoing challenge to review adopted code for structural flaws.
+
+My deep drive revealed how targeted visibility can be used to effectively monitor known risks, forming a composable
+risk management strategy. Conducting an automated audit each time the codebase changes also builds a running ledger that
+tracks surges in vulnerability exposure.
+
+This project demonstrated the effectiveness of tailoring security solutions to the environment you are securing. While
+some of the tools I designed here won't fit into every application, it has reinforced my ability to produce focused
+guardrails that enable agile development while ensuring security is always part of the picture.

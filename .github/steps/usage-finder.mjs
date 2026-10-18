@@ -1,3 +1,5 @@
+import { stripExtension } from '../security-utils/path-utils.mjs'
+
 export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
   const tracePayload = new Map();
   const tracingQueue = [];
@@ -29,9 +31,13 @@ export function findIndirectUsages(vulnerableFilesMap, fileGraph) {
     fileGraph.forEach((graphData, consumerFilePath) => {
       const consumerImportsMap = graphData.localImports;
 
+      const matchingImportKey = Object.keys(consumerImportsMap).find(
+        (importKey) => stripExtension(importKey) === stripExtension(currentPath)
+      );
+
       // Checks if the potential consumer file imports anything from the current vulnerable file
-      if (consumerImportsMap && consumerImportsMap[currentPath]) {
-        const importedSpecifiers = consumerImportsMap[currentPath];
+      if (matchingImportKey) {
+        const importedSpecifiers = consumerImportsMap[matchingImportKey];
 
         const matchesVulnerabilityTaint = importedSpecifiers.some(specifier =>
           activeTaintedExportsInFile.has(specifier) || activeTaintedExportsInFile.has('*')
