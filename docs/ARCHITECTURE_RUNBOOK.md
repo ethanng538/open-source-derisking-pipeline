@@ -3,6 +3,11 @@
 This document serves as the chronological engineering ledger for this project. It details key design considerations and
 core implementation details without all the loaded jargon.
 
+### Notes on wording
+The use of the word "component" in this runbook primarily refers to blocks of code that can be used by other files and
+do not exclusively refer to re-usable items in source code that reduce duplication in the traditional software
+development sense.
+
 ---
 
 ## 📍 Phase 1: Thinking About the Result
@@ -43,8 +48,8 @@ compiled.
 ## 📍 Phase 2: Finding Potential Vulnerabilities
 
 ### The Objective
-Find vulnerable files, not just identify vulnerable packages, and produce a report that is high in precision and
-low in noise.
+Achieve granular vulnerability mapping by identifying the components that ingest vulnerable dependencies and their
+'consumers', producing reports that are low in noise without making any assumptions about reachability.
 
 ### Identifying Tainted Elements
 The vulnerable packages are identified by comparing the project's dependencies against a public vulnerability database.
@@ -60,7 +65,7 @@ not falsely flagged.
 
 ### Tracing Taint
 To track indirect usages, all files are scanned to see if they reference a tainted component. If they do, taint is
-inherited into the consumer file.
+inherited into the consumer file, tainting the consumer component.
 
 The chains of exposure are also recorded along with whether a file is indirectly exposed to multiple vulnerable
 import-to-invocation chains. For example, a menu may take multiple components from other files. If those components
@@ -119,7 +124,7 @@ as `CONFIRMED` and instance E correctly shows both vulnerable dependencies and b
 
 ## Product Retrospective
 
-It is a growing trends for teams and organisations to use open-source code to jump-start their development. My deep dive
+It is a growing trend for teams and organisations to use open-source code to jump-start their development. My deep dive
 revealed how visibility can be used to manage risk and inform security decisions throughout development.
 
 What I took away was what could be gained by analysing the code provided by the framework. While not every open-source
